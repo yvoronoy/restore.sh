@@ -7,6 +7,7 @@ It restores dump files created by Magento Support module or backup.sh script:
 code dump (for ex. f0fe94ea2a96cfb1ff3be6dada7be17f.201205151512.sql.gz)
 DB dump (for ex. f0fe94ea2a96cfb1ff3be6dada7be17f.201205151512.tar.gz)
 ```
+![Image of Yaktocat](https://github.com/yvoronoy/ReadmeMedia/blob/master/restore.sh.gif)
 
 ### Options
 ```
