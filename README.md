@@ -1,5 +1,5 @@
-# restore.sh
-Magento Support Restore Script
+# Magento Support Restore Script 
+~/bin/restore.sh
 
 This script is designed to be run from folder with Magento dumps.
 It restores dump files created by Magento Support module or backup.sh script:
