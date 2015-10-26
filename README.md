@@ -7,7 +7,7 @@ It restores dump files created by Magento Support module or backup.sh script:
 code dump (for ex. f0fe94ea2a96cfb1ff3be6dada7be17f.201205151512.sql.gz)
 DB dump (for ex. f0fe94ea2a96cfb1ff3be6dada7be17f.201205151512.tar.gz)
 ```
-![Image of Yaktocat](https://github.com/yvoronoy/ReadmeMedia/blob/master/restore.sh.gif)
+![Screencast restore.sh](https://github.com/yvoronoy/ReadmeMedia/blob/master/restore.sh.gif)
 
 ### Options
 ```
@@ -29,26 +29,12 @@ Add configuration params:
 DBHOST=localhost
 DBUSER=your_user
 DBPASS=your_pass
-BASE_URL_PREFIX=http://dev.local/magento/custom/
+BASE_URL_PREFIX=http://dev.local/path/to/magento/
 ```
 Run script
 
 - DB name will be DBUSER DBPREFIX CURENT_DIR_NAME (ex: root_magento_sup1234) 
 - Base url will be BASE_URL_PREFIX AND CURRENT_DIR_NAME (ex: http://dev.local/path/to/magento/current)
 
-### Some examples
-```
-$ls
-f0fe94ea2a96cfb1ff3be6dada7be17f.201205151512.sql.gz  f0fe94ea2a96cfb1ff3be6dada7be17f.201205151512.tar.gz
-
-$restore.sh
-Enter DB name and press [ENTER]: mage_tmp
-Enter DB user and press [ENTER]: root
-Enter DB password and press [ENTER]: root
-Enter Base url and press [ENTER]: http://dev.local/path/to/magento/
-Start create new DB mage_tmp - OK
-Please wait DB dump start restore - OK
-Please wait Code dump start extract - OK
-```
 ### Progress bar
-In order to see progress bar while restoring DB dump you can install pv util.
+In order to see progress bar while restoring DB dump you should install pv util.
