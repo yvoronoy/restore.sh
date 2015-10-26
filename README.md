@@ -26,7 +26,7 @@ Create new file .restore.conf in your home directory. (~/.restore.conf)
 
 Add configuration params:
 ```
-DBHOST=sparta-db
+DBHOST=localhost
 DBUSER=your_user
 DBPASS=your_pass
 BASE_URL_PREFIX=http://dev.local/magento/custom/
