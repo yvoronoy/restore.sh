@@ -224,6 +224,8 @@ function extractCode()
     EXTRACT_FILENAME=$FILENAME_CODE_DUMP
     extract
 
+    find . -type f -exec chmod 664 {} \;
+    find . -type d -exec chmod 775 {} \;
     mkdir -p $MAGENTO_FOLDER_VAR
     mkdir -p $MAGENTO_FOLDER_MEDIA
     chmod -R 0777 $MAGENTO_FOLDER_VAR $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_ETC
