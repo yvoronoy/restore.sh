@@ -697,7 +697,7 @@ EOF
 function getOrigEnterpriseXml()
 {
     cp ${MAGENTOROOT}app/etc/enterprise.xml ${MAGENTOROOT}app/etc/enterprise.xml.merchant
-    cat << 'EOF' > app/etc/enterprise.xml
+    cat << 'EOF' > ${MAGENTOROOT}app/etc/enterprise.xml
 <?xml version='1.0' encoding="utf-8" ?>
 <!--
 /**
@@ -866,7 +866,7 @@ function cleanInstall()
     createDb
     echo -n "Please wait started installation - "
 
-    CMD="chmod -R 0777 ./var ./media ./app/etc"
+    CMD="chmod -R 0777 ${MAGENTOROOT}var ${MAGENTOROOT}media ${MAGENTOROOT}app/etc"
     runCommand;
 
     CMD="php -f install.php -- --license_agreement_accepted yes \
