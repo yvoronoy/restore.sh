@@ -228,7 +228,7 @@ function extractCode()
     find . -type d -exec chmod 775 {} \;
     mkdir -p $MAGENTO_FOLDER_VAR
     mkdir -p $MAGENTO_FOLDER_MEDIA
-    chmod -R 0777 $MAGENTO_FOLDER_VAR $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_ETC
+    chmod -R 2777 $MAGENTO_FOLDER_VAR $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_ETC
 
     PARAMNAME=table_prefix
     getLocalValue
@@ -866,7 +866,7 @@ function cleanInstall()
     createDb
     echo -n "Please wait started installation - "
 
-    CMD="chmod -R 0777 ${MAGENTOROOT}var ${MAGENTOROOT}media ${MAGENTOROOT}app/etc"
+    CMD="chmod -R 2777 ${MAGENTOROOT}var ${MAGENTOROOT}media ${MAGENTOROOT}app/etc"
     runCommand;
 
     CMD="php -f install.php -- --license_agreement_accepted yes \
