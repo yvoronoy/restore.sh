@@ -4,25 +4,26 @@
 # You can use config file
 # Create file in home directory .restore.conf
 # Or in directory where restore.sh placed
-#
-# Example config file .restore.conf
-# ======================================================
-# DBHOST=localhost
-# DBUSER=root
-# DBPASS=root
-# BASE_URL_PREFIX=http://mage.dev/path/to/magento/
-# ======================================================
+
 export LC_CTYPE=C
 export LANG=C
 
 #Define variables
 DBHOST=
+TMP_DBHOST=
 DBNAME=
+TMP_DBNAME=
 DBUSER=
+TMP_DBUSER=
 DBPASS=
+TMP_DBPASS=
 BASE_URL=
+TMP_BASE_URL=
+# DEV_TABLE_PREFIX=
+# TMP_DEV_TABLE_PREFIX=
+
 TABLE_PREFIX=
-DBPREFIX=magento
+DBPREFIX=
 CRYPT_KEY=
 INSTALL_DATE=
 
@@ -53,13 +54,29 @@ function initScriptOptions()
     case "${SCRIPT_OPTIONS}" in
     -h|--help )
         echo "Magento Restore script"
-        echo "restore.sh [option]"
-        echo "[options]"
-        echo "-h|--help - show available params for script"
-        echo "-w|--without-config - force do not use config"
-        echo "-f|--force - force install without wizzard"
-        echo "-c|--reconfigure - ReConfigure current magento instance"
-        echo "-r|--clean-install - Standard install procedure through CLI"
+        echo "Usage: ${0} [option]"
+        echo "    -h, --help            show available params for script"
+        echo "    -w, --without-config  force do not use config"
+        echo "    -f, --force           force install without wizzard"
+        echo "    -r, --reconfigure     ReConfigure current magento instance"
+        echo "    -c, --clean-install   Standard install procedure through CLI"
+        echo ""
+        echo "Your \"~/${CONFIG_FILE_NAME}\" file must be manually created in your home directory."
+        echo ""
+        echo "Missing entries are treated as empty strings."
+        echo ""
+        echo "In most cases, if the requested value is left blank on the command line then"
+        echo "the corresponding value from the config file is used. In the special case"
+        echo "of the DB name, If the DB name is empty in the config file and none is entered"
+        echo "on the command line then the current working directory basename is used."
+        echo "Digits are allowed as a DB name."
+        echo ""
+        echo "Sample \"~/${CONFIG_FILE_NAME}\":"
+        echo "DBHOST=sparta-db"
+        echo "DBNAME=rwoodbury_test"
+        echo "DBUSER=rwoodbury"
+        echo "DBPASS="
+        echo "BASE_URL=http://sparta.corp.magento.com/dev/rwoodbury/"
         exit;;
     -w|--without-config )
         FORCE_WITHOUT_CONFIG=1;
@@ -67,7 +84,7 @@ function initScriptOptions()
     -f|--force )
         FORCE_RESTORE=1
         ;;
-    -i|--clean-install )
+    -c|--clean-install )
         MODE=clean-install
         ;;
     -r|--reconfigure )
@@ -95,51 +112,90 @@ function checkBackupFiles()
 
 function getPathConfigFile()
 {
-        if [ -f ~/"${CONFIG_FILE_NAME}" ]
-        then
-            PATH_CONFIG_FILE=~/${CONFIG_FILE_NAME}
-        else
-            PATH_CONFIG_FILE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/${CONFIG_FILE_NAME}
-        fi
+    if [ -f ~/"${CONFIG_FILE_NAME}" ]
+    then
+        PATH_CONFIG_FILE=~/${CONFIG_FILE_NAME}
+    else
+        PATH_CONFIG_FILE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/${CONFIG_FILE_NAME}
+    fi
 }
 
 function initVariables()
 {
     getPathConfigFile
-    if [ ${FORCE_WITHOUT_CONFIG} -eq 1 ] || [ ! -f "$PATH_CONFIG_FILE" ]
-    then
-        echo -n "Enter DB host and press [ENTER]: "
-        read DBHOST
-        if [ -z "$DBHOST" ]
-        then
-            DBHOST="localhost"
-        fi
-        echo -n "Enter DB name and press [ENTER]: "
-        read DBNAME
-        echo -n "Enter DB user and press [ENTER]: "
-        read DBUSER
-        echo -n "Enter DB password and press [ENTER]: "
-        read DBPASS
-        echo -n "Enter Base url and press [ENTER]: "
-        read BASE_URL
-    else
-        echo "Read from config file: $PATH_CONFIG_FILE"
-        source ${PATH_CONFIG_FILE}
 
-        DBNAME=${DBUSER}_${DBPREFIX}_${CURRENT_DIR_NAME}
-        BASE_URL=${BASE_URL_PREFIX}${CURRENT_DIR_NAME}/
+    # Read defaults from config file if it exists.
+    if [ ${FORCE_WITHOUT_CONFIG} -ne 1 ] && [ -f "$PATH_CONFIG_FILE" ]
+    then
+        source ${PATH_CONFIG_FILE}
     fi
 
+    echo -n "Enter DB host [${DBHOST}]: "
+    read TMP_DBHOST
+    if [ -n "$TMP_DBHOST" ]
+    then
+        DBHOST=$TMP_DBHOST
+    fi
+
+    if [ -z "$DBNAME" ]
+    then
+        DBNAME=$CURRENT_DIR_NAME
+    fi
+    echo -n "Enter DB name [${DBNAME}]: "
+    read TMP_DBNAME
+    if [ -n "$TMP_DBNAME" ]
+    then
+        DBNAME=$TMP_DBNAME
+    fi
+
+    echo -n "Enter DB user [${DBUSER}]: "
+    read TMP_DBUSER
+    if [ -n "$TMP_DBUSER" ]
+    then
+        DBUSER=$TMP_DBUSER
+    fi
+
+    echo -n "Enter DB user's password [${DBPASS}]: "
+    read TMP_DBPASS
+    if [ -n "$TMP_DBPASS" ]
+    then
+        DBPASS=$TMP_DBPASS
+    fi
+
+#   if [ "${DBNAME}" != "${CURRENT_DIR_NAME}" ]
+#   then
+#       DEV_TABLE_PREFIX="${CURRENT_DIR_NAME}_"
+#   fi
+#   echo -n "Enter developer table prefix [${DEV_TABLE_PREFIX}]: "
+#   read TMP_DEV_TABLE_PREFIX
+#   if [ -n "$TMP_DEV_TABLE_PREFIX" ]
+#   then
+#       DEV_TABLE_PREFIX=$TMP_DEV_TABLE_PREFIX
+#   fi
+
+    echo -n "Enter base url [${BASE_URL}]: "
+    read TMP_BASE_URL
+    if [ -n "$TMP_BASE_URL" ]
+    then
+        BASE_URL="${TMP_BASE_URL}"
+    fi
+
+    BASE_URL="${BASE_URL}${CURRENT_DIR_NAME}/"
+
+
     _prepareDbName;
+    echo ""
+    echo "Check parameters:"
     echo "DB host is: ${DBHOST}"
     echo "DB name is: ${DBNAME}"
     echo "DB user is: ${DBUSER}"
-    echo "DB pass is: ******"
-    echo "Base url is: ${BASE_URL}"
+    echo "DB pass is: ${DBPASS}"
+#   echo "Additional table prefix: ${DEV_TABLE_PREFIX}"
+    echo "Full base url is: ${BASE_URL}"
 
     if [ ${FORCE_RESTORE} -eq 0 ]
     then
-        echo -n "Press [ENTER] for continue [Yes/no]: "
+        echo -n "Continue? [YES/no]: "
         read CONFIRM
 
         case ${CONFIRM} in
@@ -148,25 +204,7 @@ function initVariables()
         esac
     fi
 
-    if [ ! -f "$PATH_CONFIG_FILE"  ]
-    then
-        echo -n "Do you want to save entered information to config file? [yes/No]: "
-        read CONFIRM
-        case ${CONFIRM} in
-            [Yy]|[Yy][Ee][Ss])
-                BASE_URL_PREFIX=$(dirname $BASE_URL)/
-                cat << EOF > ~/$CONFIG_FILE_NAME
-DBHOST=$DBHOST
-DBUSER=$DBUSER
-DBPASS=$DBPASS
-BASE_URL_PREFIX=$BASE_URL_PREFIX
-EOF
-                echo "Config file has been created in ~/${CONFIG_FILE_NAME}";
-            ;;
-        esac
-    fi
-
-    echo "--";
+    echo ""
 }
 
 function _prepareDbName()
@@ -196,30 +234,31 @@ function getDbDumpFilename()
 
 function createDb
 {
-    mysqladmin --force -h$DBHOST -u$DBUSER --password=$DBPASS drop $DBNAME 2>/dev/null
-    echo -n "Start create new DB ${DBNAME} - "
-    mysqladmin -h$DBHOST -u$DBUSER --password=$DBPASS create $DBNAME 2>/dev/null
+    mysqladmin --force -h$DBHOST -u$DBUSER -p$DBPASS drop $DBNAME 2>/dev/null
+
+    echo -n "Creating DB \"${DBNAME}\" - "
+    mysqladmin -h$DBHOST -u$DBUSER -p$DBPASS create $DBNAME 2>/dev/null
     echo "OK"
 }
 
 function restoreDb()
 {
-    echo -n "Please wait DB dump start restore - "
-
+    echo -n "Restoring DB from dump"
 
     if which pv > /dev/null
     then
-        pv ${FILENAME_DB_DUMP} | gunzip -c | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h$DBHOST -u$DBUSER --password=$DBPASS --force $DBNAME
+        echo ":"
+        pv ${FILENAME_DB_DUMP} | gunzip -c | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h$DBHOST -u$DBUSER -p$DBPASS --force $DBNAME 2>/dev/null
     else
-        gunzip -c $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h$DBHOST -u$DBUSER --password=$DBPASS --force $DBNAME
+        echo -n " - "
+        gunzip -c $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h$DBHOST -u$DBUSER -p$DBPASS --force $DBNAME 2>/dev/null
+        echo "OK"
     fi
-
-    echo "OK"
 }
 
 function extractCode()
 {
-    echo -n "Please wait Code dump start extract - "
+    echo -n "Extracting code - "
 
     EXTRACT_FILENAME=$FILENAME_CODE_DUMP
     extract
@@ -260,54 +299,53 @@ function extract()
      fi
 }
 
-function updateBaseUrl()
-{
-    SQLQUERY="UPDATE ${DBNAME}.${TABLE_PREFIX}core_config_data AS e SET e.value = '${BASE_URL}' WHERE e.path IN ('web/secure/base_url', 'web/unsecure/base_url')"
-    mysqlQuery
-}
-
 function setupDbConfig()
 {
-    SQLQUERY="DELETE FROM ${DBNAME}.${TABLE_PREFIX}core_config_data WHERE path LIKE 'web/cookie/%'"
-    mysqlQuery
+    echo -n "Replacing DB values. - "
 
-    SQLQUERY="DELETE FROM ${DBNAME}.${TABLE_PREFIX}core_config_data WHERE path IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
-    mysqlQuery
+    SQLQUERY="UPDATE ${TABLE_PREFIX}core_config_data SET value = '${BASE_URL}' WHERE path IN ('web/secure/base_url', 'web/unsecure/base_url')"
+    runMysqlQuery
 
-    SQLQUERY="DELETE FROM ${DBNAME}.${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/base_link_url', 'web/secure/base_skin_url', 'web/secure/base_media_url', 'web/secure/base_js_url')"
-    mysqlQuery
+    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path LIKE 'web/cookie/%'"
+    runMysqlQuery
 
-    SQLQUERY="DELETE FROM ${DBNAME}.${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/use_in_adminhtml')"
-    mysqlQuery
+    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
+    runMysqlQuery
 
-    SQLQUERY="DELETE FROM ${DBNAME}.${TABLE_PREFIX}core_config_data WHERE path LIKE 'admin/url/%'"
-    mysqlQuery
+    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/base_link_url', 'web/secure/base_skin_url', 'web/secure/base_media_url', 'web/secure/base_js_url')"
+    runMysqlQuery
 
-    resetAdminPassword
-}
+    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/use_in_adminhtml')"
+    runMysqlQuery
 
-function resetAdminPassword()
-{
-    SQLQUERY="SELECT user_id FROM ${DBNAME}.${TABLE_PREFIX}admin_user WHERE username = 'admin'";
-    mysqlQuery
+    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path LIKE 'admin/url/%'"
+    runMysqlQuery
+
+
+    SQLQUERY="SELECT user_id FROM ${TABLE_PREFIX}admin_user WHERE username = 'admin'";
+    runMysqlQuery
     USER_ID=$(echo ${SQLQUERY_RESULT} | sed -e 's/^[a-zA-Z_]*//');
 
     if [ -z "$USER_ID" ]
     then
-        SQLQUERY="SELECT user_id FROM ${DBNAME}.${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1";
-        mysqlQuery
+        SQLQUERY="SELECT user_id FROM ${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1";
+        runMysqlQuery
         USER_ID=$(echo ${SQLQUERY_RESULT} | sed -e 's/^[a-zA-Z_]*//');
     fi
 
-    SQLQUERY="UPDATE ${DBNAME}.${TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1 WHERE user_id = ${USER_ID}";
-    mysqlQuery
+    SQLQUERY="UPDATE ${TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1 WHERE user_id = ${USER_ID}";
+    runMysqlQuery
 
-    SQLQUERY="UPDATE ${DBNAME}.${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}";
-    mysqlQuery
+    SQLQUERY="UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}";
+    runMysqlQuery
+
+    echo "OK"
 }
 
 function updateLocalXml()
 {
+    echo -n "Updating local XML files. - "
+
     LOCALXML_PARAM_NAME=key
     LOCALXML_VALUE=${CRYPT_KEY}
     _updateLocalXmlParam
@@ -339,6 +377,8 @@ function updateLocalXml()
     LOCALXML_PARAM_NAME=frontName
     LOCALXML_VALUE="admin"
     _updateLocalXmlParam
+
+    echo "OK"
 }
 
 function _updateLocalXmlParam()
@@ -351,9 +391,9 @@ getLocalValue() {
     PARAMVALUE=$(sed -n -e "s/.*<$PARAMNAME><!\[CDATA\[\(.*\)\]\]><\/$PARAMNAME>.*/\1/p" ${LOCALXMLPATH} | head -n 1)
 }
 
-function mysqlQuery()
+function runMysqlQuery()
 {
-    SQLQUERY_RESULT=$(mysql -h$DBHOST -u${DBUSER} --password=${DBPASS} --execute="${SQLQUERY}" 2>/dev/null);
+    SQLQUERY_RESULT=$(mysql -h$DBHOST -u$DBUSER -p$DBPASS -D $DBNAME -e "${SQLQUERY}" 2>/dev/null);
 }
 
 function debug()
@@ -365,6 +405,7 @@ function debug()
 
     echo "KEY: ${DEBUG_KEY} VALUE: ${DEBUG_VAL}"
 }
+
 function getOrigHtaccess()
 {
     cp ${MAGENTOROOT}.htaccess ${MAGENTOROOT}.htaccess.merchant
@@ -842,9 +883,8 @@ EOF
 
 function reConfigure()
 {
-    echo -n "Please wait reconfigure config - "
+#     echo -n "Reconfigure - "
 
-    updateBaseUrl
     getOrigHtaccess
     getMediaOrigHtaccess
     getOrigLocalXml
@@ -853,7 +893,7 @@ function reConfigure()
     updateLocalXml
     setupDbConfig
 
-    echo "OK"
+#     echo "OK"
 }
 
 function cleanInstall()
