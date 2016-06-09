@@ -14,6 +14,7 @@ These changes have been tested with Ubuntu 14.04 Server.
 This script is designed to be run from folder with Magento dumps.
 It restores dump files created by Magento Support module or backup.sh script:
 > code dump (for ex. f0fe94ea2a96cfb1ff3be6dada7be17f.201205151512.sql.gz)
+
 > DB dump (for ex. f0fe94ea2a96cfb1ff3be6dada7be17f.201205151512.tar.gz)
 
 ## Options
@@ -66,4 +67,4 @@ reid@u14p55m56a:/var/www/9999$
 ```
 
 # Progress bar
-In order to see a progress bar while restoring a dump you should install `pv` util.
+In order to see a progress bar while restoring a dump you will need to install the `pv` utility.
