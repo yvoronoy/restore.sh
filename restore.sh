@@ -930,6 +930,18 @@ function runCommand()
     eval $CMD;
 }
 
+function gitAdd()
+{
+    if [ -d ".git" ]
+    then
+        rm -rf ".git" 2>/dev/null;
+    fi
+
+    `git init 2>/dev/null`;
+    `git add !(@(*.gz|var|media)) 2>/dev/null`;
+    `git commit -m "initial customer deployment" 1&2>/dev/null`;
+}
+
 function main()
 {
     initScriptOptions
