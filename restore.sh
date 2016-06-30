@@ -49,15 +49,16 @@ FORCE_WITHOUT_CONFIG=0;
 FORCE_RESTORE=0;
 VERBOSE=
 
+
 function initScriptOptions()
 {
     case "${SCRIPT_OPTIONS}" in
-    -h|--help )
+    -?|--help )
         echo "Magento Restore script"
         echo "Usage: ${0} [option]"
-        echo "    -h, --help            show available params for script"
-        echo "    -w, --without-config  force do not use config"
-        echo "    -f, --force           force install without wizzard"
+        echo "    -?, --help            show available params for script"
+        echo "    -w, --without-config  do not use config file data"
+        echo "    -f, --force           install without check step"
         echo "    -r, --reconfigure     ReConfigure current magento instance"
         echo "    -c, --clean-install   Standard install procedure through CLI"
         echo ""
@@ -89,6 +90,10 @@ function initScriptOptions()
         ;;
     -r|--reconfigure )
         MODE=reconfigure
+        ;;
+
+    -h|--host )
+        DBHOST=reconfigure
         ;;
     esac
 }
@@ -195,7 +200,7 @@ function initVariables()
 
     if [ ${FORCE_RESTORE} -eq 0 ]
     then
-        echo -n "Continue? [YES/no]: "
+        echo -n "Continue? [Y/n]: "
         read CONFIRM
 
         case ${CONFIRM} in
@@ -214,6 +219,7 @@ function _prepareDbName()
 
 function getCodeDumpFilename()
 {
+	# TODO: more file types/endings
     FILENAME_CODE_DUMP=$(ls -1 *.tbz2 *.tar.bz2 2> /dev/null | head -n1)
     if [ "${FILENAME_CODE_DUMP}" == "" ]
     then
@@ -267,7 +273,7 @@ function extractCode()
     find . -type d -exec chmod 775 {} \;
     mkdir -p $MAGENTO_FOLDER_VAR
     mkdir -p $MAGENTO_FOLDER_MEDIA
-    chmod -R 2777 $MAGENTO_FOLDER_VAR $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_ETC
+    chmod -R 02777 $MAGENTO_FOLDER_VAR $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_ETC
 
     PARAMNAME=table_prefix
     getLocalValue
@@ -286,13 +292,13 @@ function extractCode()
 
 function extract()
 {
+	# Modern versions of tar can automatically choose the p
      if [ -f $EXTRACT_FILENAME ] ; then
          case $EXTRACT_FILENAME in
-             *.tar.bz2)   tar xjf $EXTRACT_FILENAME;;
-             *.tar.gz)    gunzip -c $EXTRACT_FILENAME | gunzip -cf | tar -x ;;
-             *.gz)        gunzip $EXTRACT_FILENAME;;
-             *.tbz2)      tar xjf $EXTRACT_FILENAME;;
-             *)           echo "'$EXTRACT_FILENAME' cannot be extracted";;
+             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)   tar xf $EXTRACT_FILENAME;;
+             *.gz)        gunzip -k $EXTRACT_FILENAME;;
+             *.bz|*.bz2)  bunzip2 -k $EXTRACT_FILENAME;;
+             *)           echo "'$EXTRACT_FILENAME' could not be extracted";;
          esac
      else
          echo "'$EXTRACT_FILENAME' is not a valid file"
@@ -797,31 +803,31 @@ function getOrigIndex()
  *
  * NOTICE OF LICENSE
  *
- * This source file is subject to the Magento Enterprise Edition License
- * that is bundled with this package in the file LICENSE_EE.txt.
+ * This source file is subject to the Magento Enterprise Edition End User License
+ * Agreement that is bundled with this package in the file LICENSE_EE.txt.
  * It is also available through the world-wide-web at this URL:
- * http://www.magentocommerce.com/license/enterprise-edition
+ * http://www.magento.com/license/enterprise-edition
  * If you did not receive a copy of the license and are unable to
  * obtain it through the world-wide-web, please send an email
- * to license@magentocommerce.com so we can send you a copy immediately.
+ * to license@magento.com so we can send you a copy immediately.
  *
  * DISCLAIMER
  *
  * Do not edit or add to this file if you wish to upgrade Magento to newer
  * versions in the future. If you wish to customize Magento for your
- * needs please refer to http://www.magentocommerce.com for more information.
+ * needs please refer to http://www.magento.com for more information.
  *
  * @category    Mage
  * @package     Mage
- * @copyright   Copyright (c) 2013 Magento Inc. (http://www.magentocommerce.com)
- * @license     http://www.magentocommerce.com/license/enterprise-edition
+ * @copyright Copyright (c) 2006-2015 X.commerce, Inc. (http://www.magento.com)
+ * @license http://www.magento.com/license/enterprise-edition
  */
 
-if (version_compare(phpversion(), '5.2.0', '<')===true) {
+if (version_compare(phpversion(), '5.3.0', '<')===true) {
     echo  '<div style="font:12px/1.35em arial, helvetica, sans-serif;">
 <div style="margin:0 0 25px 0; border-bottom:1px solid #ccc;">
 <h3 style="margin:0; font-size:1.7em; font-weight:normal; text-transform:none; text-align:left; color:#2f2f2f;">
-Whoops, it looks like you have an invalid PHP version.</h3></div><p>Magento supports PHP 5.2.0 or newer.
+Whoops, it looks like you have an invalid PHP version.</h3></div><p>Magento supports PHP 5.3.0 or newer.
 <a href="http://www.magentocommerce.com/install" target="">Find out</a> how to install</a>
  Magento using PHP-CGI as a work-around.</p></div>';
     exit;
@@ -849,7 +855,7 @@ if (!file_exists($mageFilename)) {
     if (is_dir('downloader')) {
         header("Location: downloader");
     } else {
-        echo $mageFilename." was not found";
+        echo $mageFilename, " was not found";
     }
     exit;
 }
@@ -867,7 +873,7 @@ if (isset($_SERVER['MAGE_IS_DEVELOPER_MODE'])) {
     Mage::setIsDeveloperMode(true);
 }
 
-#ini_set('display_errors', 1);
+ini_set('display_errors', 1);
 
 umask(0);
 
@@ -938,7 +944,7 @@ function gitAdd()
     fi
 
     `git init 2>/dev/null`;
-    `git add !(@(*.gz|var|media)) 2>/dev/null`;
+    `git add !(@(*.gz|*.tgz|*.tbz2|var|media)) 2>/dev/null`;
     `git commit -m "initial customer deployment" 1&2>/dev/null`;
 }
 
@@ -960,6 +966,7 @@ function main()
             createDb
             restoreDb
             reConfigure
+            gitAdd
             ;;
     esac
 
