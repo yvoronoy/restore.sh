@@ -8,19 +8,14 @@
 export LC_CTYPE=C
 export LANG=C
 
+####################################################################################################
 #Define variables
-DBHOST=
-TMP_DBHOST=
+DBHOST="localhost"
 DBNAME=
-TMP_DBNAME=
 DBUSER=
-TMP_DBUSER=
 DBPASS=
-TMP_DBPASS=
 BASE_URL=
-TMP_BASE_URL=
 # DEV_TABLE_PREFIX=
-# TMP_DEV_TABLE_PREFIX=
 
 TABLE_PREFIX=
 DBPREFIX=
@@ -43,59 +38,56 @@ MAGENTO_FOLDER_MEDIA=${MAGENTOROOT}media
 MAGENTO_FOLDER_ETC=${MAGENTOROOT}app/etc
 
 CONFIG_FILE_NAME=.restore.conf
-CURRENT_DIR_NAME=$(basename $(pwd))
+DEPLOYMENT_DIR_NAME=$(basename "$(pwd)")
 SCRIPT_OPTIONS=$1
 FORCE_WITHOUT_CONFIG=0;
 FORCE_RESTORE=0;
 VERBOSE=
+OPT_SHOW_HELP=0
+
+unset OPT_DBHOST
+unset OPT_DBNAME
+unset OPT_DBUSER
+unset OPT_DBPASS
+unset OPT_BASE_URL
 
 
-function initScriptOptions()
+
+####################################################################################################
+#Define functions.
+
+function showHelp()
 {
-    case "${SCRIPT_OPTIONS}" in
-    -?|--help )
-        echo "Magento Restore script"
-        echo "Usage: ${0} [option]"
-        echo "    -?, --help            show available params for script"
-        echo "    -w, --without-config  do not use config file data"
-        echo "    -f, --force           install without check step"
-        echo "    -r, --reconfigure     ReConfigure current magento instance"
-        echo "    -c, --clean-install   Standard install procedure through CLI"
-        echo ""
-        echo "Your \"~/${CONFIG_FILE_NAME}\" file must be manually created in your home directory."
-        echo ""
-        echo "Missing entries are treated as empty strings."
-        echo ""
-        echo "In most cases, if the requested value is left blank on the command line then"
-        echo "the corresponding value from the config file is used. In the special case"
-        echo "of the DB name, If the DB name is empty in the config file and none is entered"
-        echo "on the command line then the current working directory basename is used."
-        echo "Digits are allowed as a DB name."
-        echo ""
-        echo "Sample \"~/${CONFIG_FILE_NAME}\":"
-        echo "DBHOST=sparta-db"
-        echo "DBNAME=rwoodbury_test"
-        echo "DBUSER=rwoodbury"
-        echo "DBPASS="
-        echo "BASE_URL=http://sparta.corp.magento.com/dev/rwoodbury/"
-        exit;;
-    -w|--without-config )
-        FORCE_WITHOUT_CONFIG=1;
-        ;;
-    -f|--force )
-        FORCE_RESTORE=1
-        ;;
-    -c|--clean-install )
-        MODE=clean-install
-        ;;
-    -r|--reconfigure )
-        MODE=reconfigure
-        ;;
-
-    -h|--host )
-        DBHOST=reconfigure
-        ;;
-    esac
+    echo "Magento Restore script"
+    echo "Usage: ${0} [option]"
+    echo "    -?, --help            show available params for script"
+    echo "    -w, --without-config  do not use config file data"
+    echo "    -f, --force           install without check step"
+    echo "    -r, --reconfigure     ReConfigure current magento instance"
+    echo "    -c, --clean-install   Standard install procedure through CLI"
+    echo "    -h, --host            DB host IP address, defaults to \"localhost\""
+    echo "    -D, --database        Database or schema name"
+    echo "    -u, --user            DB user name"
+    echo "    -p, --password        DB password"
+    echo "    -b, --base-url        Base URL for this deployment"
+    echo ""
+    echo "Your \"~/${CONFIG_FILE_NAME}\" file must be manually created in your home directory."
+    echo ""
+    echo "Missing entries are treated as empty strings."
+    echo ""
+    echo "In most cases, if the requested value is left blank on the command line then"
+    echo "the corresponding value from the config file is used. In the special case"
+    echo "of the DB name, If the DB name is empty in the config file and none is entered"
+    echo "on the command line then the current working directory basename is used."
+    echo "Digits are allowed as a DB name."
+    echo ""
+    echo "Sample \"~/${CONFIG_FILE_NAME}\":"
+    echo "DBHOST=sparta-db"
+    echo "DBNAME=rwoodbury_test"
+    echo "DBUSER=rwoodbury"
+    echo "DBPASS="
+    echo "BASE_URL=http://sparta.corp.magento.com/dev/rwoodbury/"
+    echo ""
 }
 
 function checkBackupFiles()
@@ -103,14 +95,14 @@ function checkBackupFiles()
     getCodeDumpFilename
     if [ ! -f "$FILENAME_CODE_DUMP" ]
     then
-        echo "Code dump absent"
+        echo "Code dump absent" >&2
         exit 1
     fi
 
     getDbDumpFilename
     if [ ! -f "$FILENAME_DB_DUMP" ]
     then
-        echo "Db dump absent"
+        echo "DB dump absent" >&2
         exit 1
     fi
 }
@@ -119,12 +111,13 @@ function getPathConfigFile()
 {
     if [ -f ~/"${CONFIG_FILE_NAME}" ]
     then
-        PATH_CONFIG_FILE=~/${CONFIG_FILE_NAME}
+        PATH_CONFIG_FILE=~/"${CONFIG_FILE_NAME}"
     else
-        PATH_CONFIG_FILE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/${CONFIG_FILE_NAME}
+        PATH_CONFIG_FILE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/${CONFIG_FILE_NAME}"
     fi
 }
 
+####################################################################################################
 function initVariables()
 {
     getPathConfigFile
@@ -135,41 +128,20 @@ function initVariables()
         source ${PATH_CONFIG_FILE}
     fi
 
-    echo -n "Enter DB host [${DBHOST}]: "
-    read TMP_DBHOST
-    if [ -n "$TMP_DBHOST" ]
-    then
-        DBHOST=$TMP_DBHOST
-    fi
+    DBHOST="${OPT_DBHOST:-$DBHOST}"
 
     if [ -z "$DBNAME" ]
     then
-        DBNAME=$CURRENT_DIR_NAME
-    fi
-    echo -n "Enter DB name [${DBNAME}]: "
-    read TMP_DBNAME
-    if [ -n "$TMP_DBNAME" ]
-    then
-        DBNAME=$TMP_DBNAME
+        DBNAME="$DEPLOYMENT_DIR_NAME"
     fi
 
-    echo -n "Enter DB user [${DBUSER}]: "
-    read TMP_DBUSER
-    if [ -n "$TMP_DBUSER" ]
-    then
-        DBUSER=$TMP_DBUSER
-    fi
+    DBNAME="${OPT_DBNAME:-$DBNAME}"
+    DBUSER="${OPT_DBUSER:-$DBUSER}"
+    DBPASS="${OPT_DBPASS:-$DBPASS}"
 
-    echo -n "Enter DB user's password [${DBPASS}]: "
-    read TMP_DBPASS
-    if [ -n "$TMP_DBPASS" ]
-    then
-        DBPASS=$TMP_DBPASS
-    fi
-
-#   if [ "${DBNAME}" != "${CURRENT_DIR_NAME}" ]
+#   if [ "${DBNAME}" != "${DEPLOYMENT_DIR_NAME}" ]
 #   then
-#       DEV_TABLE_PREFIX="${CURRENT_DIR_NAME}_"
+#       DEV_TABLE_PREFIX="${DEPLOYMENT_DIR_NAME}_"
 #   fi
 #   echo -n "Enter developer table prefix [${DEV_TABLE_PREFIX}]: "
 #   read TMP_DEV_TABLE_PREFIX
@@ -178,17 +150,11 @@ function initVariables()
 #       DEV_TABLE_PREFIX=$TMP_DEV_TABLE_PREFIX
 #   fi
 
-    echo -n "Enter base url [${BASE_URL}]: "
-    read TMP_BASE_URL
-    if [ -n "$TMP_BASE_URL" ]
-    then
-        BASE_URL="${TMP_BASE_URL}"
-    fi
+    BASE_URL="${OPT_BASE_URL:-$BASE_URL}"
+    BASE_URL="${BASE_URL}${DEPLOYMENT_DIR_NAME}/"
 
-    BASE_URL="${BASE_URL}${CURRENT_DIR_NAME}/"
+    DBNAME=$(echo "$DBNAME" | sed "s/[^a-zA-Z0-9_]//g" | tr '[A-Z]' '[a-z]');
 
-
-    _prepareDbName;
     echo ""
     echo "Check parameters:"
     echo "DB host is: ${DBHOST}"
@@ -205,45 +171,39 @@ function initVariables()
 
         case ${CONFIRM} in
             [Yy]|[Yy][Ee][Ss]) ;;
-            [Nn]|[Nn][Oo]) echo "Interrupted by user, exiting..." && exit;;
+            [Nn]|[Nn][Oo]) echo "Interrupted by user, exiting..."; exit;;
         esac
     fi
 
     echo ""
 }
 
-function _prepareDbName()
-{
-    DBNAME=$(echo "$DBNAME" | sed "s/[^a-zA-Z0-9_]//g" | tr '[A-Z]' '[a-z]');
-}
-
 function getCodeDumpFilename()
 {
-	# TODO: more file types/endings
+    # TODO: more file types/endings
     FILENAME_CODE_DUMP=$(ls -1 *.tbz2 *.tar.bz2 2> /dev/null | head -n1)
     if [ "${FILENAME_CODE_DUMP}" == "" ]
     then
         FILENAME_CODE_DUMP=$(ls -1 *.tar.gz | grep -v 'logs.tar.gz' | head -n1)
     fi
-    DEBUG_KEY="Code dump Filename"
-    DEBUG_VAL=$FILENAME_CODE_DUMP
-    debug
+
+    debug "Code dump Filename" "$FILENAME_CODE_DUMP"
 }
 
 function getDbDumpFilename()
 {
     FILENAME_DB_DUMP=$(ls -1 *.sql.gz | head -n1)
-    DEBUG_KEY="DB dump Filename"
-    DEBUG_VAL=$FILENAME_DB_DUMP
-    debug
+
+    debug "DB dump Filename" "$FILENAME_DB_DUMP"
 }
 
+####################################################################################################
 function createDb
 {
     mysqladmin --force -h$DBHOST -u$DBUSER -p$DBPASS drop $DBNAME 2>/dev/null
 
     echo -n "Creating DB \"${DBNAME}\" - "
-    mysqladmin -h$DBHOST -u$DBUSER -p$DBPASS create $DBNAME 2>/dev/null
+    mysqladmin -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" create "$DBNAME" 2>/dev/null
     echo "OK"
 }
 
@@ -254,20 +214,31 @@ function restoreDb()
     if which pv > /dev/null
     then
         echo ":"
-        pv ${FILENAME_DB_DUMP} | gunzip -c | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h$DBHOST -u$DBUSER -p$DBPASS --force $DBNAME 2>/dev/null
+        pv $FILENAME_DB_DUMP | gunzip -c | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force "$DBNAME" 2>/dev/null
     else
         echo -n " - "
-        gunzip -c $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h$DBHOST -u$DBUSER -p$DBPASS --force $DBNAME 2>/dev/null
+        gunzip -c $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force "$DBNAME" 2>/dev/null
         echo "OK"
     fi
 }
 
+####################################################################################################
 function extractCode()
 {
     echo -n "Extracting code - "
 
-    EXTRACT_FILENAME=$FILENAME_CODE_DUMP
-    extract
+    # Modern versions of tar can automatically choose the decompression type.
+     if [ -f $FILENAME_CODE_DUMP ] ; then
+         case $FILENAME_CODE_DUMP in
+             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)   tar xf $FILENAME_CODE_DUMP;;
+             *.gz)        gunzip -k $FILENAME_CODE_DUMP;;
+             *.bz|*.bz2)  bunzip2 -k $FILENAME_CODE_DUMP;;
+             *)           echo "'$FILENAME_CODE_DUMP' could not be extracted" >&2; exit 1;;
+         esac
+     else
+         echo "'$FILENAME_CODE_DUMP' is not a valid file" >&2
+         exit 1
+     fi
 
     find . -type f -exec chmod 664 {} \;
     find . -type d -exec chmod 775 {} \;
@@ -275,131 +246,82 @@ function extractCode()
     mkdir -p $MAGENTO_FOLDER_MEDIA
     chmod -R 02777 $MAGENTO_FOLDER_VAR $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_ETC
 
-    PARAMNAME=table_prefix
-    getLocalValue
-    TABLE_PREFIX=${PARAMVALUE}
+    getLocalValue "table_prefix"
+    TABLE_PREFIX="${PARAMVALUE}"
 
-    PARAMNAME=date
-    getLocalValue
-    INSTALL_DATE=${PARAMVALUE}
+    getLocalValue "date"
+    INSTALL_DATE="${PARAMVALUE}"
 
-    PARAMNAME=key
-    getLocalValue
-    CRYPT_KEY=${PARAMVALUE}
+    getLocalValue "key"
+    CRYPT_KEY="${PARAMVALUE}"
 
     echo "OK"
 }
 
-function extract()
-{
-	# Modern versions of tar can automatically choose the p
-     if [ -f $EXTRACT_FILENAME ] ; then
-         case $EXTRACT_FILENAME in
-             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)   tar xf $EXTRACT_FILENAME;;
-             *.gz)        gunzip -k $EXTRACT_FILENAME;;
-             *.bz|*.bz2)  bunzip2 -k $EXTRACT_FILENAME;;
-             *)           echo "'$EXTRACT_FILENAME' could not be extracted";;
-         esac
-     else
-         echo "'$EXTRACT_FILENAME' is not a valid file"
-     fi
-}
-
+####################################################################################################
 function setupDbConfig()
 {
     echo -n "Replacing DB values. - "
 
-    SQLQUERY="UPDATE ${TABLE_PREFIX}core_config_data SET value = '${BASE_URL}' WHERE path IN ('web/secure/base_url', 'web/unsecure/base_url')"
-    runMysqlQuery
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '${BASE_URL}' WHERE path IN ('web/secure/base_url', 'web/unsecure/base_url')"
 
-    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path LIKE 'web/cookie/%'"
-    runMysqlQuery
+    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path LIKE 'web/cookie/%'"
 
-    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
-    runMysqlQuery
+    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
 
-    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/base_link_url', 'web/secure/base_skin_url', 'web/secure/base_media_url', 'web/secure/base_js_url')"
-    runMysqlQuery
+    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/base_link_url', 'web/secure/base_skin_url', 'web/secure/base_media_url', 'web/secure/base_js_url')"
 
-    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/use_in_adminhtml')"
-    runMysqlQuery
+    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/use_in_adminhtml')"
 
-    SQLQUERY="DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path LIKE 'admin/url/%'"
-    runMysqlQuery
+    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path LIKE 'admin/url/%'"
 
 
-    SQLQUERY="SELECT user_id FROM ${TABLE_PREFIX}admin_user WHERE username = 'admin'";
-    runMysqlQuery
-    USER_ID=$(echo ${SQLQUERY_RESULT} | sed -e 's/^[a-zA-Z_]*//');
+    runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user WHERE username = 'admin'"
+    USER_ID=$(echo "${SQLQUERY_RESULT}" | sed -e 's/^[a-zA-Z_]*//');
 
     if [ -z "$USER_ID" ]
     then
-        SQLQUERY="SELECT user_id FROM ${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1";
-        runMysqlQuery
-        USER_ID=$(echo ${SQLQUERY_RESULT} | sed -e 's/^[a-zA-Z_]*//');
+        runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1"
+        USER_ID=$(echo "${SQLQUERY_RESULT}" | sed -e 's/^[a-zA-Z_]*//');
     fi
 
-    SQLQUERY="UPDATE ${TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1 WHERE user_id = ${USER_ID}";
-    runMysqlQuery
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1 WHERE user_id = ${USER_ID}"
 
-    SQLQUERY="UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}";
-    runMysqlQuery
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
 
     echo "OK"
 }
 
+####################################################################################################
 function updateLocalXml()
 {
     echo -n "Updating local XML files. - "
 
-    LOCALXML_PARAM_NAME=key
-    LOCALXML_VALUE=${CRYPT_KEY}
-    _updateLocalXmlParam
-
-    LOCALXML_PARAM_NAME=date
-    LOCALXML_VALUE=${INSTALL_DATE}
-    _updateLocalXmlParam
-
-    LOCALXML_PARAM_NAME=table_prefix
-    LOCALXML_VALUE=${TABLE_PREFIX}
-    _updateLocalXmlParam
-
-    LOCALXML_PARAM_NAME=username
-    LOCALXML_VALUE=${DBUSER}
-    _updateLocalXmlParam
-
-    LOCALXML_PARAM_NAME=password
-    LOCALXML_VALUE=${DBPASS}
-    _updateLocalXmlParam
-
-    LOCALXML_PARAM_NAME=dbname
-    LOCALXML_VALUE=${DBNAME}
-    _updateLocalXmlParam
-
-    LOCALXML_PARAM_NAME=host
-    LOCALXML_VALUE=${DBHOST}
-    _updateLocalXmlParam
-
-    LOCALXML_PARAM_NAME=frontName
-    LOCALXML_VALUE="admin"
-    _updateLocalXmlParam
+    _updateLocalXmlParam "key" "${CRYPT_KEY}"
+    _updateLocalXmlParam "date" "${INSTALL_DATE}"
+    _updateLocalXmlParam "table_prefix" "${TABLE_PREFIX}"
+    _updateLocalXmlParam "username" "${DBUSER}"
+    _updateLocalXmlParam "password" "${DBPASS}"
+    _updateLocalXmlParam "dbname" "${DBNAME}"
+    _updateLocalXmlParam "host" "${DBHOST}"
+    _updateLocalXmlParam "frontName" "admin"
 
     echo "OK"
 }
 
 function _updateLocalXmlParam()
 {
-    sed "s/<${LOCALXML_PARAM_NAME}><\!\[CDATA\[.*\]\]><\/${LOCALXML_PARAM_NAME}>/<${LOCALXML_PARAM_NAME}><\!\[CDATA\[${LOCALXML_VALUE}\]\]><\/${LOCALXML_PARAM_NAME}>/" $LOCALXMLPATH > $LOCALXMLPATH.new
+    sed "s/<${1}><\!\[CDATA\[.*\]\]><\/${1}>/<${1}><\!\[CDATA\[${2}\]\]><\/${1}>/" $LOCALXMLPATH > $LOCALXMLPATH.new
     mv -f $LOCALXMLPATH.new $LOCALXMLPATH
 }
 
 getLocalValue() {
-    PARAMVALUE=$(sed -n -e "s/.*<$PARAMNAME><!\[CDATA\[\(.*\)\]\]><\/$PARAMNAME>.*/\1/p" ${LOCALXMLPATH} | head -n 1)
+    PARAMVALUE=$(sed -n -e "s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p" ${LOCALXMLPATH} | head -n 1)
 }
 
 function runMysqlQuery()
 {
-    SQLQUERY_RESULT=$(mysql -h$DBHOST -u$DBUSER -p$DBPASS -D $DBNAME -e "${SQLQUERY}" 2>/dev/null);
+    SQLQUERY_RESULT=$(mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" -D "$DBNAME" -e "${1}" 2>/dev/null);
 }
 
 function debug()
@@ -409,7 +331,7 @@ function debug()
         return
     fi
 
-    echo "KEY: ${DEBUG_KEY} VALUE: ${DEBUG_VAL}"
+    echo "KEY: ${1} VALUE: ${2}"
 }
 
 function getOrigHtaccess()
@@ -889,8 +811,6 @@ EOF
 
 function reConfigure()
 {
-#     echo -n "Reconfigure - "
-
     getOrigHtaccess
     getMediaOrigHtaccess
     getOrigLocalXml
@@ -898,15 +818,13 @@ function reConfigure()
     getOrigIndex
     updateLocalXml
     setupDbConfig
-
-#     echo "OK"
 }
 
 function cleanInstall()
 {
     if [ -f "$LOCALXMLPATH" ]
     then
-        echo "Magento already installed, remove local.xml file to reinstall"
+        echo "Magento already installed, remove local.xml file to reinstall" >&2
         exit 1;
     fi
     createDb
@@ -948,30 +866,67 @@ function gitAdd()
     `git commit -m "initial customer deployment" 1&2>/dev/null`;
 }
 
-function main()
-{
-    initScriptOptions
-    initVariables
 
-    case "$MODE" in
-        clean-install)
-            cleanInstall
-            ;;
-        reconfigure)
-            reConfigure
-            ;;
-        *)
-            checkBackupFiles
-            extractCode
-            createDb
-            restoreDb
-            reConfigure
-            gitAdd
-            ;;
+####################################################################################################
+##  MAIN  ##########################################################################################
+####################################################################################################
+
+####################################################################################################
+#   Parse options and set environment.
+OPTIONS=`getopt -o ?wfcrh:D:u:p:b: -l help,without-config,force,clean-install,reconfigure,host:,database:,user:,password:,base-url: -n "${0}" -- "$@"`
+
+if [ $? != 0 ] ; then
+    echo "Failed parsing options." >&2
+    echo
+    showHelp
+    exit 1
+fi
+
+eval set -- "$OPTIONS"
+
+while true; do
+    case "$1" in
+        -e|--help )             OPT_SHOW_HELP=1; shift 1 ;;
+        -w|--without-config )   FORCE_WITHOUT_CONFIG=1; shift 1 ;;
+        -f|--force )            FORCE_RESTORE=1; shift 1 ;;
+        -c|--clean-install )    MODE=clean-install; shift 1 ;;
+        -r|--reconfigure )      MODE=reconfigure; shift 1 ;;
+        -h|--host )             OPT_DBHOST=$2; shift 2;;
+        -D|--database )         OPT_DBNAME=$2; shift 2;;
+        -u|--user )             OPT_DBUSER=$2; shift 2;;
+        -p|--password )         OPT_DBPASS=$2; shift 2;;
+        -b|--base-url )         OPT_BASE_URL=$2; shift 2;;
+        -- ) shift; break;;
+        * ) echo "Internal getopt parse error!"; echo; showHelp; exit 1;;
     esac
+done
 
+
+####################################################################################################
+# Execute.
+if [ $OPT_SHOW_HELP -eq 1 ]
+then
+    showHelp
     exit 0
-}
+fi
 
-main
+initVariables
 
+case "$MODE" in
+    clean-install)
+        cleanInstall
+        ;;
+    reconfigure)
+        reConfigure
+        ;;
+    *)
+        checkBackupFiles
+        extractCode
+        createDb
+        restoreDb
+        reConfigure
+#         gitAdd
+        ;;
+esac
+
+exit 0
