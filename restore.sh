@@ -39,17 +39,15 @@ MAGENTO_FOLDER_ETC=${MAGENTOROOT}app/etc
 
 CONFIG_FILE_NAME=.restore.conf
 DEPLOYMENT_DIR_NAME=$(basename "$(pwd)")
-SCRIPT_OPTIONS=$1
-FORCE_WITHOUT_CONFIG=0;
-FORCE_RESTORE=0;
-VERBOSE=
-OPT_SHOW_HELP=0
+FORCE_WITHOUT_CONFIG=0
+FORCE_RESTORE=0
+VERBOSE=0
 
-unset OPT_DBHOST
-unset OPT_DBNAME
-unset OPT_DBUSER
-unset OPT_DBPASS
-unset OPT_BASE_URL
+# unset OPT_DBHOST
+# unset OPT_DBNAME
+# unset OPT_DBUSER
+# unset OPT_DBPASS
+# unset OPT_BASE_URL
 
 
 
@@ -65,11 +63,18 @@ function showHelp()
     echo "    -f, --force           install without check step"
     echo "    -r, --reconfigure     ReConfigure current magento instance"
     echo "    -c, --clean-install   Standard install procedure through CLI"
+    echo "    -m, --mode            must have one of the following:"
+    echo "                          \"reconfigure\", \"clean-install\", \"code\", or \"db\""
+    echo "                          The first two are optional usages of the previous two options."
+    echo "                          \"code\" tells the script to only decompress the code, and"
+    echo "                          \"db\" to only move the data into the database."
     echo "    -h, --host            DB host IP address, defaults to \"localhost\""
-    echo "    -D, --database        Database or schema name"
+    echo "    -D, --database        Database or schema name, defaults to current directory name"
     echo "    -u, --user            DB user name"
     echo "    -p, --password        DB password"
-    echo "    -b, --base-url        Base URL for this deployment"
+    echo "    -b, --base-url        Base URL for this deployment host."
+    echo ""
+    echo "This script assumes it is being run from the new deployment directory with merchant backup files."
     echo ""
     echo "Your \"~/${CONFIG_FILE_NAME}\" file must be manually created in your home directory."
     echo ""
@@ -90,16 +95,30 @@ function showHelp()
     echo ""
 }
 
-function checkBackupFiles()
+function getCodeDumpFile()
 {
-    getCodeDumpFilename
+    # TODO: more file types/endings
+    FILENAME_CODE_DUMP=$(ls -1 *.tbz2 *.tar.bz2 2> /dev/null | head -n1)
+    if [ "${FILENAME_CODE_DUMP}" == "" ]
+    then
+        FILENAME_CODE_DUMP=$(ls -1 *.tar.gz | grep -v 'logs.tar.gz' | head -n1)
+    fi
+
+    debug "Code dump Filename" "$FILENAME_CODE_DUMP"
+
     if [ ! -f "$FILENAME_CODE_DUMP" ]
     then
         echo "Code dump absent" >&2
         exit 1
     fi
+}
 
-    getDbDumpFilename
+function getDbDumpFile()
+{
+    FILENAME_DB_DUMP=$(ls -1 *.sql.gz | head -n1)
+
+    debug "DB dump Filename" "$FILENAME_DB_DUMP"
+
     if [ ! -f "$FILENAME_DB_DUMP" ]
     then
         echo "DB dump absent" >&2
@@ -178,25 +197,6 @@ function initVariables()
     echo ""
 }
 
-function getCodeDumpFilename()
-{
-    # TODO: more file types/endings
-    FILENAME_CODE_DUMP=$(ls -1 *.tbz2 *.tar.bz2 2> /dev/null | head -n1)
-    if [ "${FILENAME_CODE_DUMP}" == "" ]
-    then
-        FILENAME_CODE_DUMP=$(ls -1 *.tar.gz | grep -v 'logs.tar.gz' | head -n1)
-    fi
-
-    debug "Code dump Filename" "$FILENAME_CODE_DUMP"
-}
-
-function getDbDumpFilename()
-{
-    FILENAME_DB_DUMP=$(ls -1 *.sql.gz | head -n1)
-
-    debug "DB dump Filename" "$FILENAME_DB_DUMP"
-}
-
 ####################################################################################################
 function createDb
 {
@@ -228,17 +228,17 @@ function extractCode()
     echo -n "Extracting code - "
 
     # Modern versions of tar can automatically choose the decompression type.
-     if [ -f $FILENAME_CODE_DUMP ] ; then
-         case $FILENAME_CODE_DUMP in
-             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)   tar xf $FILENAME_CODE_DUMP;;
-             *.gz)        gunzip -k $FILENAME_CODE_DUMP;;
-             *.bz|*.bz2)  bunzip2 -k $FILENAME_CODE_DUMP;;
-             *)           echo "'$FILENAME_CODE_DUMP' could not be extracted" >&2; exit 1;;
-         esac
-     else
-         echo "'$FILENAME_CODE_DUMP' is not a valid file" >&2
-         exit 1
-     fi
+    if [ -f $FILENAME_CODE_DUMP ] ; then
+        case $FILENAME_CODE_DUMP in
+            *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)   tar xf $FILENAME_CODE_DUMP;;
+            *.gz)        gunzip -k $FILENAME_CODE_DUMP;;
+            *.bz|*.bz2)  bunzip2 -k $FILENAME_CODE_DUMP;;
+            *)           echo "'$FILENAME_CODE_DUMP' could not be extracted" >&2; exit 1;;
+        esac
+    else
+        echo "'$FILENAME_CODE_DUMP' is not a valid file" >&2
+        exit 1
+    fi
 
     find . -type f -exec chmod 664 {} \;
     find . -type d -exec chmod 775 {} \;
@@ -326,8 +326,7 @@ function runMysqlQuery()
 
 function debug()
 {
-    if [ $DEBUG_MODE -eq 0 ]
-    then
+    if [ $DEBUG_MODE -eq 0 ]; then
         return
     fi
 
@@ -817,7 +816,6 @@ function reConfigure()
     getOrigEnterpriseXml
     getOrigIndex
     updateLocalXml
-    setupDbConfig
 }
 
 function cleanInstall()
@@ -856,14 +854,18 @@ function runCommand()
 
 function gitAdd()
 {
+    echo -n "Wrapping deployment with 'git' repository - "
+
     if [ -d ".git" ]
     then
-        rm -rf ".git" 2>/dev/null;
+        rm -rf .git >/dev/null 2>&1
     fi
 
-    `git init 2>/dev/null`;
-    `git add !(@(*.gz|*.tgz|*.tbz2|var|media)) 2>/dev/null`;
-    `git commit -m "initial customer deployment" 1&2>/dev/null`;
+    git init >/dev/null 2>&1
+    git add .ht* api.php app cron* downloader errors get.php includes in* js lib mage pkginfo shell skin >/dev/null 2>&1
+    git commit -m "initial customer deployment" >/dev/null 2>&1
+
+    echo "OK"
 }
 
 
@@ -873,7 +875,7 @@ function gitAdd()
 
 ####################################################################################################
 #   Parse options and set environment.
-OPTIONS=`getopt -o ?wfcrh:D:u:p:b: -l help,without-config,force,clean-install,reconfigure,host:,database:,user:,password:,base-url: -n "${0}" -- "$@"`
+OPTIONS=`getopt -o wfrcm:h:D:u:p:b: -l help,without-config,force,reconfigure,clean-install,mode:,host:,database:,user:,password:,base-url: -n "${0}" -- "$@"`
 
 if [ $? != 0 ] ; then
     echo "Failed parsing options." >&2
@@ -886,16 +888,17 @@ eval set -- "$OPTIONS"
 
 while true; do
     case "$1" in
-        -e|--help )             OPT_SHOW_HELP=1; shift 1 ;;
-        -w|--without-config )   FORCE_WITHOUT_CONFIG=1; shift 1 ;;
-        -f|--force )            FORCE_RESTORE=1; shift 1 ;;
-        -c|--clean-install )    MODE=clean-install; shift 1 ;;
-        -r|--reconfigure )      MODE=reconfigure; shift 1 ;;
-        -h|--host )             OPT_DBHOST=$2; shift 2;;
-        -D|--database )         OPT_DBNAME=$2; shift 2;;
-        -u|--user )             OPT_DBUSER=$2; shift 2;;
-        -p|--password )         OPT_DBPASS=$2; shift 2;;
-        -b|--base-url )         OPT_BASE_URL=$2; shift 2;;
+        --help )                showHelp; exit 0;;
+        -w|--without-config )   FORCE_WITHOUT_CONFIG=1; shift 1;;
+        -f|--force )            FORCE_RESTORE=1; shift 1;;
+        -r|--reconfigure )      MODE="reconfigure"; shift 1;;
+        -c|--clean-install )    MODE="clean-install"; shift 1;;
+        -m|--mode )             MODE="$2"; shift 2;;
+        -h|--host )             OPT_DBHOST="$2"; shift 2;;
+        -D|--database )         OPT_DBNAME="$2"; shift 2;;
+        -u|--user )             OPT_DBUSER="$2"; shift 2;;
+        -p|--password )         OPT_DBPASS="$2"; shift 2;;
+        -b|--base-url )         OPT_BASE_URL="$2"; shift 2;;
         -- ) shift; break;;
         * ) echo "Internal getopt parse error!"; echo; showHelp; exit 1;;
     esac
@@ -904,28 +907,57 @@ done
 
 ####################################################################################################
 # Execute.
-if [ $OPT_SHOW_HELP -eq 1 ]
-then
-    showHelp
-    exit 0
-fi
-
-initVariables
-
 case "$MODE" in
-    clean-install)
+    # --reconfigure
+    'reconfigure' )
+    	initVariables
+        reConfigure
+        setupDbConfig
+        gitAdd
+        ;;
+
+    # --clean-install
+    'clean-install' )
+    	initVariables
         cleanInstall
         ;;
-    reconfigure)
-        reConfigure
-        ;;
-    *)
-        checkBackupFiles
+
+    # --mode code
+    'code' )
+    	initVariables
+        getCodeDumpFile
         extractCode
+        reConfigure
+        gitAdd
+        ;;
+
+    # --mode db
+    'db' )
+    	initVariables
+        getDbDumpFile
+        createDb
+        restoreDb
+        setupDbConfig
+        ;;
+
+    # Empty "mode". Do everything.
+    '' )
+    	initVariables
+        getCodeDumpFile
+        extractCode
+        getDbDumpFile
         createDb
         restoreDb
         reConfigure
-#         gitAdd
+        setupDbConfig
+        gitAdd
+        ;;
+
+    * )
+        echo "Bad mode."
+        echo
+        showHelp
+        exit 1
         ;;
 esac
 
