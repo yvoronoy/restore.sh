@@ -214,7 +214,7 @@ function restoreDb()
     if which pv > /dev/null
     then
         echo ":"
-        pv $FILENAME_DB_DUMP | gunzip -c | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force "$DBNAME" 2>/dev/null
+        pv $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force "$DBNAME" 2>/dev/null
     else
         echo -n " - "
         gunzip -c $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force "$DBNAME" 2>/dev/null
@@ -225,35 +225,34 @@ function restoreDb()
 ####################################################################################################
 function extractCode()
 {
-    echo -n "Extracting code - "
+    echo -n "Extracting code"
 
-    # Modern versions of tar can automatically choose the decompression type.
-    if [ -f $FILENAME_CODE_DUMP ] ; then
+    if [ ! -f $FILENAME_CODE_DUMP ] ; then
+        echo "'$FILENAME_CODE_DUMP' is not a valid file" >&2
+        exit 1
+    fi
+
+    if which pv > /dev/null; then
+        echo ":"
+        case $FILENAME_CODE_DUMP in
+            *.tar.gz|*.tgz)         pv -B 32k $FILENAME_CODE_DUMP | tar zxf - ;;
+            *.tar.bz2|*.tbz2|*.tbz) pv -B 32k $FILENAME_CODE_DUMP | tar jxf - ;;
+            *.gz)        gunzip -k $FILENAME_CODE_DUMP;;
+            *.bz|*.bz2)  bunzip2 -k $FILENAME_CODE_DUMP;;
+            *)           echo "'$FILENAME_CODE_DUMP' could not be extracted" >&2; exit 1;;
+        esac
+    else
+        echo -n " - "
+        # Modern versions of tar can automatically choose the decompression type when needed.
         case $FILENAME_CODE_DUMP in
             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)   tar xf $FILENAME_CODE_DUMP;;
             *.gz)        gunzip -k $FILENAME_CODE_DUMP;;
             *.bz|*.bz2)  bunzip2 -k $FILENAME_CODE_DUMP;;
             *)           echo "'$FILENAME_CODE_DUMP' could not be extracted" >&2; exit 1;;
         esac
-    else
-        echo "'$FILENAME_CODE_DUMP' is not a valid file" >&2
-        exit 1
     fi
 
-    find . -type f -exec chmod 664 {} \;
-    find . -type d -exec chmod 775 {} \;
-    mkdir -p $MAGENTO_FOLDER_VAR
-    mkdir -p $MAGENTO_FOLDER_MEDIA
-    chmod -R 02777 $MAGENTO_FOLDER_VAR $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_ETC
-
-    getLocalValue "table_prefix"
-    TABLE_PREFIX="${PARAMVALUE}"
-
-    getLocalValue "date"
-    INSTALL_DATE="${PARAMVALUE}"
-
-    getLocalValue "key"
-    CRYPT_KEY="${PARAMVALUE}"
+    chmod -R 02777 $MAGENTO_FOLDER_ETC
 
     echo "OK"
 }
@@ -262,6 +261,9 @@ function extractCode()
 function setupDbConfig()
 {
     echo -n "Replacing DB values. - "
+
+    getLocalValue "table_prefix"
+    TABLE_PREFIX="${PARAMVALUE}"
 
     runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '${BASE_URL}' WHERE path IN ('web/secure/base_url', 'web/unsecure/base_url')"
 
@@ -296,6 +298,15 @@ function setupDbConfig()
 function updateLocalXml()
 {
     echo -n "Updating local XML files. - "
+
+    getLocalValue "table_prefix"
+    TABLE_PREFIX="${PARAMVALUE}"
+
+    getLocalValue "date"
+    INSTALL_DATE="${PARAMVALUE}"
+
+    getLocalValue "key"
+    CRYPT_KEY="${PARAMVALUE}"
 
     _updateLocalXmlParam "key" "${CRYPT_KEY}"
     _updateLocalXmlParam "date" "${INSTALL_DATE}"
@@ -335,7 +346,10 @@ function debug()
 
 function getOrigHtaccess()
 {
-    cp ${MAGENTOROOT}.htaccess ${MAGENTOROOT}.htaccess.merchant
+    if [ -f ${MAGENTOROOT}.htaccess ]; then
+        cp ${MAGENTOROOT}.htaccess ${MAGENTOROOT}.htaccess.merchant
+    fi
+
     cat << 'EOF' > .htaccess
 ############################################
 ## uncomment these lines for CGI mode
@@ -546,9 +560,11 @@ function getOrigHtaccess()
 ## http://developer.yahoo.com/performance/rules.html#etags
 
     #FileETag none
+
 EOF
 
 }
+
 
 function getMediaOrigHtaccess()
 {
@@ -586,7 +602,9 @@ Options -ExecCGI
 
     RewriteRule .* ../get.php [L]
 </IfModule>
+
 EOF
+
 }
 
 function getOrigLocalXml()
@@ -659,7 +677,9 @@ function getOrigLocalXml()
         </routers>
     </admin>
 </config>
+
 EOF
+
 }
 
 function getOrigEnterpriseXml()
@@ -711,7 +731,9 @@ function getOrigEnterpriseXml()
         <skip_process_modules_updates>0</skip_process_modules_updates>
     </global>
 </config>
+
 EOF
+
 }
 
 function getOrigIndex()
@@ -805,7 +827,9 @@ $mageRunCode = isset($_SERVER['MAGE_RUN_CODE']) ? $_SERVER['MAGE_RUN_CODE'] : ''
 $mageRunType = isset($_SERVER['MAGE_RUN_TYPE']) ? $_SERVER['MAGE_RUN_TYPE'] : 'store';
 
 Mage::run($mageRunCode, $mageRunType);
+
 EOF
+
 }
 
 function reConfigure()
@@ -854,15 +878,30 @@ function runCommand()
 
 function gitAdd()
 {
-    echo -n "Wrapping deployment with 'git' repository - "
+    echo -n "Wrapping deployment with local only 'git' repository - "
 
     if [ -d ".git" ]
     then
         rm -rf .git >/dev/null 2>&1
     fi
 
+    cat << 'GIT_IGNORE_EOF' > .gitignore
+media/
+var/
+.idea/
+*.gz
+*.tgz
+*.bz
+*.bz2
+*.tbz2
+*.tbz
+*.zip
+
+GIT_IGNORE_EOF
+
     git init >/dev/null 2>&1
-    git add .ht* api.php app cron* downloader errors get.php includes in* js lib mage pkginfo shell skin >/dev/null 2>&1
+    # don't add files ending with 'z'
+    git add ./.ht* .gitignore *[a-y] >/dev/null 2>&1
     git commit -m "initial customer deployment" >/dev/null 2>&1
 
     echo "OK"
@@ -909,31 +948,32 @@ done
 # Execute.
 case "$MODE" in
     # --reconfigure
-    'reconfigure' )
-    	initVariables
+    'reconfigure')
+        initVariables
         reConfigure
         setupDbConfig
         gitAdd
         ;;
 
     # --clean-install
-    'clean-install' )
-    	initVariables
+    'clean-install')
+        initVariables
         cleanInstall
         ;;
 
     # --mode code
-    'code' )
-    	initVariables
+    'code')
+        initVariables
         getCodeDumpFile
         extractCode
         reConfigure
         gitAdd
+        mkdir -pm 02777 $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_VAR
         ;;
 
     # --mode db
-    'db' )
-    	initVariables
+    'db')
+        initVariables
         getDbDumpFile
         createDb
         restoreDb
@@ -941,8 +981,8 @@ case "$MODE" in
         ;;
 
     # Empty "mode". Do everything.
-    '' )
-    	initVariables
+    '')
+        initVariables
         getCodeDumpFile
         extractCode
         getDbDumpFile
@@ -951,14 +991,15 @@ case "$MODE" in
         reConfigure
         setupDbConfig
         gitAdd
+        mkdir -pm 02777 $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_VAR
         ;;
 
-    * )
+    *)
         echo "Bad mode."
         echo
         showHelp
         exit 1
-        ;;
+
 esac
 
 exit 0
