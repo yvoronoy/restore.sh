@@ -252,6 +252,15 @@ function extractCode()
         esac
     fi
 
+    getLocalValue "table_prefix"
+    TABLE_PREFIX="${PARAMVALUE}"
+
+    getLocalValue "date"
+    INSTALL_DATE="${PARAMVALUE}"
+
+    getLocalValue "key"
+    CRYPT_KEY="${PARAMVALUE}"
+
     chmod -R 02777 $MAGENTO_FOLDER_ETC
 
     echo "OK"
@@ -261,9 +270,6 @@ function extractCode()
 function setupDbConfig()
 {
     echo -n "Replacing DB values. - "
-
-    getLocalValue "table_prefix"
-    TABLE_PREFIX="${PARAMVALUE}"
 
     runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '${BASE_URL}' WHERE path IN ('web/secure/base_url', 'web/unsecure/base_url')"
 
@@ -298,15 +304,6 @@ function setupDbConfig()
 function updateLocalXml()
 {
     echo -n "Updating local XML files. - "
-
-    getLocalValue "table_prefix"
-    TABLE_PREFIX="${PARAMVALUE}"
-
-    getLocalValue "date"
-    INSTALL_DATE="${PARAMVALUE}"
-
-    getLocalValue "key"
-    CRYPT_KEY="${PARAMVALUE}"
 
     _updateLocalXmlParam "key" "${CRYPT_KEY}"
     _updateLocalXmlParam "date" "${INSTALL_DATE}"
@@ -985,10 +982,10 @@ case "$MODE" in
         initVariables
         getCodeDumpFile
         extractCode
+        reConfigure
         getDbDumpFile
         createDb
         restoreDb
-        reConfigure
         setupDbConfig
         gitAdd
         mkdir -pm 02777 $MAGENTO_FOLDER_MEDIA $MAGENTO_FOLDER_VAR
