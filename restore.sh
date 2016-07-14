@@ -33,21 +33,15 @@ DEBUG_VAL=
 # Magento folders
 MAGENTOROOT=./
 LOCALXMLPATH=${MAGENTOROOT}app/etc/local.xml
-MAGENTO_FOLDER_VAR=${MAGENTOROOT}var
-MAGENTO_FOLDER_MEDIA=${MAGENTOROOT}media
-MAGENTO_FOLDER_ETC=${MAGENTOROOT}app/etc
+MAGENTO_FOLDER_VAR=${MAGENTOROOT}var/
+MAGENTO_FOLDER_MEDIA=${MAGENTOROOT}media/
+MAGENTO_FOLDER_ETC=${MAGENTOROOT}app/etc/
 
 CONFIG_FILE_NAME=.restore.conf
 DEPLOYMENT_DIR_NAME=$(basename "$(pwd)")
 FORCE_WITHOUT_CONFIG=0
 FORCE_RESTORE=0
 VERBOSE=0
-
-# unset OPT_DBHOST
-# unset OPT_DBNAME
-# unset OPT_DBUSER
-# unset OPT_DBPASS
-# unset OPT_BASE_URL
 
 
 
@@ -130,9 +124,9 @@ function getPathConfigFile()
 {
     if [ -f ~/"${CONFIG_FILE_NAME}" ]
     then
-        PATH_CONFIG_FILE=~/"${CONFIG_FILE_NAME}"
+        PATH_CONFIG_FILE=~/${CONFIG_FILE_NAME}
     else
-        PATH_CONFIG_FILE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/${CONFIG_FILE_NAME}"
+        PATH_CONFIG_FILE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/${CONFIG_FILE_NAME}
     fi
 }
 
@@ -203,7 +197,7 @@ function createDb
     mysqladmin --force -h$DBHOST -u$DBUSER -p$DBPASS drop $DBNAME 2>/dev/null
 
     echo -n "Creating DB \"${DBNAME}\" - "
-    mysqladmin -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" create "$DBNAME" 2>/dev/null
+    mysqladmin -h$DBHOST -u$DBUSER -p$DBPASS create $DBNAME 2>/dev/null
     echo "OK"
 }
 
@@ -214,10 +208,10 @@ function restoreDb()
     if which pv > /dev/null
     then
         echo ":"
-        pv $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force "$DBNAME" 2>/dev/null
+        pv $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h$DBHOST -u$DBUSER -p$DBPASS --force $DBNAME 2>/dev/null
     else
         echo -n " - "
-        gunzip -c $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force "$DBNAME" 2>/dev/null
+        gunzip -c $FILENAME_DB_DUMP | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h$DBHOST -u$DBUSER -p$DBPASS --force $DBNAME 2>/dev/null
         echo "OK"
     fi
 }
@@ -329,7 +323,7 @@ getLocalValue() {
 
 function runMysqlQuery()
 {
-    SQLQUERY_RESULT=$(mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" -D "$DBNAME" -e "${1}" 2>/dev/null);
+    SQLQUERY_RESULT=$(mysql -h$DBHOST -u$DBUSER -p$DBPASS -D $DBNAME -e "${1}" 2>/dev/null);
 }
 
 function debug()
@@ -347,7 +341,7 @@ function getOrigHtaccess()
         cp ${MAGENTOROOT}.htaccess ${MAGENTOROOT}.htaccess.merchant
     fi
 
-    cat << 'EOF' > .htaccess
+    cat << 'EOF' > ${MAGENTOROOT}.htaccess
 ############################################
 ## uncomment these lines for CGI mode
 ## make sure to specify the correct cgi php binary file name
@@ -569,11 +563,12 @@ function getMediaOrigHtaccess()
     then
         return;
     fi
-    if [ -f "${MAGENTO_FOLDER_MEDIA}/.htaccess" ]
+
+    if [ -f "${MAGENTO_FOLDER_MEDIA}.htaccess" ]
     then
-        cp ${MAGENTO_FOLDER_MEDIA}/.htaccess ${MAGENTO_FOLDER_MEDIA}/.htaccess.merchant
-    fi
-    cat << 'EOF' > ${MAGENTO_FOLDER_MEDIA}/.htaccess
+        cp ${MAGENTO_FOLDER_MEDIA}.htaccess ${MAGENTO_FOLDER_MEDIA}.htaccess.merchant
+
+		cat << 'EOF' > ${MAGENTO_FOLDER_MEDIA}.htaccess
 Options All -Indexes
 <IfModule mod_php5.c>
 php_flag engine 0
@@ -602,6 +597,7 @@ Options -ExecCGI
 
 EOF
 
+    fi
 }
 
 function getOrigLocalXml()
@@ -974,6 +970,7 @@ case "$MODE" in
         getDbDumpFile
         createDb
         restoreDb
+        reConfigure
         setupDbConfig
         ;;
 
