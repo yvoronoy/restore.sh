@@ -896,7 +896,9 @@ GIT_IGNORE_EOF
 
     git init >/dev/null 2>&1
     # don't add files ending with 'z'
-    git add ./.ht* .gitignore *[a-y] >/dev/null 2>&1
+    git add -f ./.ht* .gitignore *[a-y] >/dev/null 2>&1
+    git rm --cached media var
+    git add -u
     git commit -m "initial customer deployment" >/dev/null 2>&1
 
     echo "OK"
