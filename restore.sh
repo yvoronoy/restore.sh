@@ -895,10 +895,16 @@ var/
 GIT_IGNORE_EOF
 
     git init >/dev/null 2>&1
-    # don't add files ending with 'z'
-    git add -f ./.ht* .gitignore *[a-y] >/dev/null 2>&1
-    git rm --cached media var
-    git add -u
+
+    OLD_GLOBIGNORE="$GLOBIGNORE"
+
+    # don't add files are are archive types or 'media' or 'var', etc.
+	GLOBIGNORE="media:var:.idea:*.gz:*.tgz:*.bz:*.bz2:*.tbz2:*.tbz:*.zip"
+
+    git add ./.ht* .gitignore * >/dev/null 2>&1
+
+	GLOBIGNORE="$OLD_GLOBIGNORE"
+
     git commit -m "initial customer deployment" >/dev/null 2>&1
 
     echo "OK"
