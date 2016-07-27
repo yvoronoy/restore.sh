@@ -889,7 +889,7 @@ function gitAdd()
 {
     echo -n "Wrapping deployment with local only 'git' repository - "
 
-    gitAddQuiet()
+    gitAddQuiet
 
     echo "OK"
 }
