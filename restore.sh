@@ -267,7 +267,8 @@ function setupDbConfig()
 {
     echo -n "Replacing DB values. - "
 
-    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '${BASE_URL}' WHERE path IN ('web/secure/base_url', 'web/unsecure/base_url')"
+	setConfigValue 'web/secure/base_url' "${BASE_URL}"
+	setConfigValue 'web/unsecure/base_url' "${BASE_URL}"
 
     runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path LIKE 'web/cookie/%'"
 
@@ -277,7 +278,14 @@ function setupDbConfig()
 
     runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/use_in_adminhtml')"
 
-    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path LIKE 'admin/url/%'"
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '0' WHERE path LIKE 'admin/url/%'"
+
+	setConfigValue 'general/locale/code' 'en_US'
+	setConfigValue 'dev/css/merge_css_files' '0'
+	setConfigValue 'dev/js/merge_files' '0'
+	setConfigValue 'dev/log/active' '1'
+	setConfigValue 'dev/log/exception_file' 'exception_deploy.log'
+	setConfigValue 'dev/log/file' 'system_deploy.log'
 
 
     runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user WHERE username = 'admin'"
@@ -294,6 +302,12 @@ function setupDbConfig()
     runMysqlQuery "UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
 
     echo "OK"
+}
+
+##	Pass parameters as key / value.
+function setConfigValue()
+{
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '$2' WHERE path = '$1'"
 }
 
 ####################################################################################################
@@ -875,15 +889,28 @@ function gitAdd()
 {
     echo -n "Wrapping deployment with local only 'git' repository - "
 
+    gitAddQuiet()
+
+    echo "OK"
+}
+
+function gitAddQuiet()
+{
     if [ -d ".git" ]
     then
-        rm -rf .git >/dev/null 2>&1
+        rm -rf .git
+    fi
+
+    if [ -f ".gitignore" ]
+    then
+        mv -f .gitignore .gitignore.merchant
     fi
 
     cat << 'GIT_IGNORE_EOF' > .gitignore
 media/
 var/
 .idea/
+.svn/
 *.gz
 *.tgz
 *.bz
@@ -899,15 +926,13 @@ GIT_IGNORE_EOF
     OLD_GLOBIGNORE="$GLOBIGNORE"
 
     # don't add files are are archive types or 'media' or 'var', etc.
-	GLOBIGNORE="media:var:.idea:*.gz:*.tgz:*.bz:*.bz2:*.tbz2:*.tbz:*.zip"
+	GLOBIGNORE="./media:./var:.svn:.idea:*.gz:*.tgz:*.bz:*.bz2:*.tbz2:*.tbz:*.zip"
 
-    git add ./.ht* .gitignore * >/dev/null 2>&1
+    git add ./.ht* .gitignore* * >/dev/null 2>&1
 
 	GLOBIGNORE="$OLD_GLOBIGNORE"
 
     git commit -m "initial customer deployment" >/dev/null 2>&1
-
-    echo "OK"
 }
 
 
@@ -990,12 +1015,11 @@ case "$MODE" in
         getCodeDumpFile
         extractCode
         reConfigure
+        (gitAddQuiet; mkdir -pm 02777 "$MAGENTO_FOLDER_MEDIA" "$MAGENTO_FOLDER_VAR")&
         getDbDumpFile
         createDb
         restoreDb
         setupDbConfig
-        gitAdd
-        mkdir -pm 02777 "$MAGENTO_FOLDER_MEDIA" "$MAGENTO_FOLDER_VAR"
         ;;
 
     *)
