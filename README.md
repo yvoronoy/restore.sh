@@ -5,7 +5,7 @@
 - Added modes to only process code or only import data. They are commented out as they are incomplete.
 - The added and commented out code is a start at adding/changing the existing table name prefix. Table prefix handling is incomplete.
 
-These changes have been tested with Ubuntu 14.04 Server.
+These changes have been tested with Ubuntu 14.04 Server and Debian 8.
 
 # Magento Support Restore Script
 ```
@@ -22,7 +22,6 @@ It restores dump files created by Magento Support module or backup.sh script:
 ```
 Usage: ./restore.sh [option]
     --help                show available params for script (this screen)
-    -w, --without-config  do not use config file data
     -f, --force           install without check step
     -r, --reconfigure     ReConfigure current magento instance
     -c, --clean-install   Standard install procedure through CLI
