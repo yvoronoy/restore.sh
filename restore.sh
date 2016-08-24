@@ -240,6 +240,7 @@ function doDbReconfigure()
     setConfigValue 'dev/log/exception_file' 'exception_dev.log'
     setConfigValue 'dev/log/file' 'system_dev.log'
 
+#     runMysqlQuery "DELETE FROM ${DBNAME}.${TABLE_PREFIX}core_config_data WHERE path LIKE 'web/cookie/%'"
     setConfigValue 'web/cookie/cookie_domain' ''
     setConfigValue 'web/cookie/cookie_path' ''
     setConfigValue 'web/cookie/cookie_lifetime' '0'
@@ -255,24 +256,24 @@ function doDbReconfigure()
     setConfigValue 'general/locale/code' 'en_US'
 
 
-    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
+    deleteFromConfigWhere "IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
 
-    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path IN ('web/secure/base_link_url', 'web/secure/base_skin_url', 'web/secure/base_media_url', 'web/secure/base_js_url')"
+    deleteFromConfigWhere "IN ('web/secure/base_link_url', 'web/secure/base_skin_url', 'web/secure/base_media_url', 'web/secure/base_js_url')"
 
-    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path LIKE 'admin/url/%'"
+    deleteFromConfigWhere "LIKE 'admin/url/%'"
 
-    runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user WHERE username = 'admin'"
+    runMysqlQuery "SELECT user_id FROM \\\`${TABLE_PREFIX}admin_user\\\` WHERE username = 'admin'"
     USER_ID=$(echo "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
 
     if [ -z "$USER_ID" ]
     then
-        runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1"
+        runMysqlQuery "SELECT user_id FROM \\\`${TABLE_PREFIX}admin_user\\\` ORDER BY user_id ASC LIMIT 1"
         USER_ID=$(echo "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
     fi
 
-    runMysqlQuery "UPDATE ${TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
+    runMysqlQuery "UPDATE \\\`{TABLE_PREFIX}admin_user\\\` SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
 
-    runMysqlQuery "UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
+    runMysqlQuery "UPDATE \\\`${TABLE_PREFIX}enterprise_admin_passwords\\\` SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
 
     echo "OK"
 }
@@ -280,7 +281,12 @@ function doDbReconfigure()
 ##  Pass parameters as key / value.
 function setConfigValue()
 {
-    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '$2' WHERE path = '$1'"
+    runMysqlQuery "UPDATE \\\`${TABLE_PREFIX}core_config_data\\\` SET value = '$2' WHERE path = '$1'"
+}
+
+function deleteFromConfigWhere()
+{
+    runMysqlQuery "DELETE FROM \\\`${TABLE_PREFIX}core_config_data\\\` WHERE path $1"
 }
 
 ####################################################################################################
