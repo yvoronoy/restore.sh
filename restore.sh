@@ -142,8 +142,6 @@ function initVariables()
             [Nn][Oo]?) echo "Interrupted by user, exiting..."; exit;;
         esac
     fi
-
-    echo ""
 }
 
 ####################################################################################################
@@ -292,8 +290,6 @@ function deleteFromConfigWhere()
 ####################################################################################################
 function updateLocalXml()
 {
-    echo -n "Updating local XML files. - "
-
     getLocalMerchantXmlValues
 
     updateLocalXmlParam "key" "$CRYPT_KEY"
@@ -304,8 +300,6 @@ function updateLocalXml()
     updateLocalXmlParam "dbname" "$DBNAME"
     updateLocalXmlParam "host" "$DBHOST"
     updateLocalXmlParam "frontName" "admin"
-
-    echo "OK"
 }
 
 function updateLocalXmlParam()
@@ -317,7 +311,7 @@ function updateLocalXmlParam()
 function getLocalMerchantXmlValues()
 {
     #   If empty then get the values.
-    if [ -z $INSTALL_DATE ]
+    if [ -z "$INSTALL_DATE" ]
     then
         getLocalXmlValue "table_prefix"
         TABLE_PREFIX="$PARAMVALUE"
@@ -350,11 +344,12 @@ function debug()
 
 function getOrigHtaccess()
 {
-    if [ -f "${MAGENTOROOT}/.htaccess" ]; then
-        cp "${MAGENTOROOT}/.htaccess" "${MAGENTOROOT}/.htaccess.merchant"
+    if [ ! -f "${MAGENTOROOT}/.htaccess.merchant" -a -f "${MAGENTOROOT}/.htaccess" ]; then
+        mv "${MAGENTOROOT}/.htaccess" "${MAGENTOROOT}/.htaccess.merchant"
     fi
 
-    cat << 'EOF' > "${MAGENTOROOT}/.htaccess"
+    if [ ! -f "${MAGENTOROOT}/.htaccess" ]; then
+        cat << 'EOF' > "${MAGENTOROOT}/.htaccess"
 ############################################
 ## uncomment these lines for CGI mode
 ## make sure to specify the correct cgi php binary file name
@@ -567,6 +562,8 @@ function getOrigHtaccess()
 
 EOF
 
+    fi
+
 }
 
 
@@ -577,11 +574,13 @@ function getMediaOrigHtaccess()
         return;
     fi
 
-    if [ -f "${MAGENTOROOT}/media/.htaccess" ]
+    if [ ! -f "${MAGENTOROOT}/media/.htaccess.merchant" -a -f "${MAGENTOROOT}/media/.htaccess" ]
     then
-        cp ${MAGENTOROOT}/media/.htaccess ${MAGENTOROOT}/media/.htaccess.merchant
+        mv "${MAGENTOROOT}/media/.htaccess" "${MAGENTOROOT}/media/.htaccess.merchant"
+    fi
 
-        cat << 'EOF' > ${MAGENTOROOT}/media/.htaccess
+    if [ ! -f "${MAGENTOROOT}/media/.htaccess" ]; then
+        cat << 'EOF' > "${MAGENTOROOT}/media/.htaccess"
 Options All -Indexes
 <IfModule mod_php5.c>
 php_flag engine 0
@@ -615,9 +614,12 @@ EOF
 
 function getOrigLocalXml()
 {
-    mv "${MAGENTOROOT}/app/etc/local.xml" "${MAGENTOROOT}/app/etc/local.xml.merchant"
+    if [ ! -f "${MAGENTOROOT}/app/etc/local.xml.merchant" -a -f "${MAGENTOROOT}/app/etc/local.xml" ]; then
+        mv "${MAGENTOROOT}/app/etc/local.xml" "${MAGENTOROOT}/app/etc/local.xml.merchant"
+    fi
 
-    cat << 'EOF' > "${MAGENTOROOT}/app/etc/local.xml"
+    if [ ! -f "${MAGENTOROOT}/app/etc/local.xml" ]; then
+        cat << 'EOF' > "${MAGENTOROOT}/app/etc/local.xml"
 <?xml version="1.0"?>
 <!--
 /**
@@ -687,13 +689,18 @@ function getOrigLocalXml()
 
 EOF
 
+    fi
+
 }
 
 function getOrigEnterpriseXml()
 {
-    cp "${MAGENTOROOT}/app/etc/enterprise.xml" "${MAGENTOROOT}/app/etc/enterprise.xml.merchant"
+    if [ ! -f "${MAGENTOROOT}/app/etc/enterprise.xml.merchant" -a -f "${MAGENTOROOT}/app/etc/enterprise.xml" ]; then
+        mv "${MAGENTOROOT}/app/etc/enterprise.xml" "${MAGENTOROOT}/app/etc/enterprise.xml.merchant"
+    fi
 
-    cat << 'EOF' > ${MAGENTOROOT}/app/etc/enterprise.xml
+    if [ ! -f "${MAGENTOROOT}/app/etc/enterprise.xml" ]; then
+        cat << 'EOF' > ${MAGENTOROOT}/app/etc/enterprise.xml
 <?xml version='1.0' encoding="utf-8" ?>
 <!--
 /**
@@ -742,13 +749,18 @@ function getOrigEnterpriseXml()
 
 EOF
 
+    fi
+
 }
 
 function getOrigIndex()
 {
-    cp "${MAGENTOROOT}/index.php" "${MAGENTOROOT}/index.php.merchant"
+    if [ ! -f "${MAGENTOROOT}/index.php.merchant" -a -f "${MAGENTOROOT}/index.php" ]; then
+        mv "${MAGENTOROOT}/index.php" "${MAGENTOROOT}/index.php.merchant"
+    fi
 
-    cat << 'EOF' > index.php
+    if [ ! -f "${MAGENTOROOT}/index.php" ]; then
+        cat << 'EOF' > index.php
 <?php
 /**
  * Magento Enterprise Edition
@@ -839,18 +851,25 @@ Mage::run($mageRunCode, $mageRunType);
 
 EOF
 
+    fi
+
 }
 
 function doFileReconfigure()
 {
+    echo -n "Reconfiguring files. - "
+
     getOrigHtaccess
     getMediaOrigHtaccess
     getOrigLocalXml
     getOrigEnterpriseXml
     getOrigIndex
     updateLocalXml
+
+    echo "OK"
 }
 
+####################################################################################################
 function cleanInstall()
 {
     if [ -f "${MAGENTOROOT}/app/etc/local.xml" ]
@@ -877,6 +896,7 @@ function cleanInstall()
     echo "OK"
 }
 
+####################################################################################################
 function gitAdd()
 {
     echo -n "Wrapping deployment with local only 'git' repository - "
