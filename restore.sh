@@ -83,7 +83,7 @@ function showHelp()
 ####################################################################################################
 function initVariables()
 {
-    if [ -f ~/"$CONFIG_FILE_NAME" ]
+    if [[ -f ~/"$CONFIG_FILE_NAME" ]]
     then
         PATH_CONFIG_FILE=~/"$CONFIG_FILE_NAME"
     else
@@ -91,14 +91,14 @@ function initVariables()
     fi
 
     # Read defaults from config file if it exists.
-    if [ -f "$PATH_CONFIG_FILE" ]
+    if [[ -f "$PATH_CONFIG_FILE" ]]
     then
         source "$PATH_CONFIG_FILE"
     fi
 
     DBHOST="${OPT_DBHOST:-$DBHOST}"
 
-    if [ -z $DBNAME ]
+    if [[ -z $DBNAME ]]
     then
         DBNAME="$DEPLOYMENT_DIR_NAME"
     fi
@@ -109,13 +109,13 @@ function initVariables()
     DBUSER="${OPT_DBUSER:-$DBUSER}"
     DBPASS="${OPT_DBPASS:-$DBPASS}"
 
-#   if [ $DBNAME != "$DEPLOYMENT_DIR_NAME" ]
+#   if [[ $DBNAME != "$DEPLOYMENT_DIR_NAME" ]]
 #   then
 #       DEV_TABLE_PREFIX="${DEPLOYMENT_DIR_NAME}_"
 #   fi
-#   echo -n "Enter developer table prefix [${DEV_TABLE_PREFIX}]: "
+#   echo -n "Enter developer table prefix [[${DEV_TABLE_PREFIX}]]: "
 #   read TMP_DEV_TABLE_PREFIX
-#   if [ -n "$TMP_DEV_TABLE_PREFIX" ]
+#   if [[ -n "$TMP_DEV_TABLE_PREFIX" ]]
 #   then
 #       DEV_TABLE_PREFIX=$TMP_DEV_TABLE_PREFIX
 #   fi
@@ -133,7 +133,7 @@ function initVariables()
     echo "Full base url is: $BASE_URL"
     echo "Admin email is: $ADMIN_EMAIL"
 
-    if [ ${FORCE_RESTORE} -eq 0 ]
+    if [[ ${FORCE_RESTORE} -eq 0 ]]
     then
         echo -n "Continue? [Y/n]: "
         read CONFIRM
@@ -153,7 +153,8 @@ function extractCode()
 
     debug "Code dump Filename" "$FILENAME_CODE_DUMP"
 
-    if [ ! -f "$FILENAME_CODE_DUMP" ] ; then
+    if [[ ! -f "$FILENAME_CODE_DUMP" ]]
+    then
         echo "\"$FILENAME_CODE_DUMP\" is not a valid file" >&2
         exit 1
     fi
@@ -176,14 +177,14 @@ function extractCode()
             *.bz|*.bz2)  bunzip2 -k "$FILENAME_CODE_DUMP";;
             *)           echo "\"$FILENAME_CODE_DUMP\" could not be extracted" >&2; exit 1;;
         esac
+        echo "OK"
     fi
-
-    echo "OK"
 
     echo -n "Updating permissions - "
 
     find . -type d -exec chmod a+rx {} \;
     chmod -R 02777 "${MAGENTOROOT}/app/etc"
+    mkdir -pm 02777 "${MAGENTOROOT}/media"
 
     echo "OK"
 }
@@ -204,7 +205,7 @@ function restoreDb()
 
     debug "DB dump Filename" "$FILENAME_DB_DUMP"
 
-    if [ ! -f "$FILENAME_DB_DUMP" ]
+    if [[ ! -f "$FILENAME_DB_DUMP" ]]
     then
         echo "DB dump absent" >&2
         exit 1
@@ -260,18 +261,18 @@ function doDbReconfigure()
 
     deleteFromConfigWhere "LIKE 'admin/url/%'"
 
-    runMysqlQuery "SELECT user_id FROM \\\`${TABLE_PREFIX}admin_user\\\` WHERE username = 'admin'"
+    runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user WHERE username = 'admin'"
     USER_ID=$(echo "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
 
-    if [ -z "$USER_ID" ]
+    if [[ -z "$USER_ID" ]]
     then
-        runMysqlQuery "SELECT user_id FROM \\\`${TABLE_PREFIX}admin_user\\\` ORDER BY user_id ASC LIMIT 1"
+        runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1"
         USER_ID=$(echo "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
     fi
 
-    runMysqlQuery "UPDATE \\\`{TABLE_PREFIX}admin_user\\\` SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
+    runMysqlQuery "UPDATE {TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
 
-    runMysqlQuery "UPDATE \\\`${TABLE_PREFIX}enterprise_admin_passwords\\\` SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
 
     echo "OK"
 }
@@ -279,12 +280,12 @@ function doDbReconfigure()
 ##  Pass parameters as key / value.
 function setConfigValue()
 {
-    runMysqlQuery "UPDATE \\\`${TABLE_PREFIX}core_config_data\\\` SET value = '$2' WHERE path = '$1'"
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '$2' WHERE path = '$1'"
 }
 
 function deleteFromConfigWhere()
 {
-    runMysqlQuery "DELETE FROM \\\`${TABLE_PREFIX}core_config_data\\\` WHERE path $1"
+    runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path $1"
 }
 
 ####################################################################################################
@@ -311,7 +312,7 @@ function updateLocalXmlParam()
 function getLocalMerchantXmlValues()
 {
     #   If empty then get the values.
-    if [ -z "$INSTALL_DATE" ]
+    if [[ -z "$INSTALL_DATE" ]]
     then
         getLocalXmlValue "table_prefix"
         TABLE_PREFIX="$PARAMVALUE"
@@ -335,7 +336,8 @@ function runMysqlQuery()
 
 function debug()
 {
-    if [ $DEBUG_MODE -eq 0 ]; then
+    if [[ $DEBUG_MODE -eq 0 ]]
+    then
         return
     fi
 
@@ -344,12 +346,14 @@ function debug()
 
 function getOrigHtaccess()
 {
-    if [ ! -f "${MAGENTOROOT}/.htaccess.merchant" -a -f "${MAGENTOROOT}/.htaccess" ]; then
+    if [[ ! -f "${MAGENTOROOT}/.htaccess.merchant" && -f "${MAGENTOROOT}/.htaccess" ]]
+    then
         mv "${MAGENTOROOT}/.htaccess" "${MAGENTOROOT}/.htaccess.merchant"
     fi
 
-    if [ ! -f "${MAGENTOROOT}/.htaccess" ]; then
-        cat << 'EOF' > "${MAGENTOROOT}/.htaccess"
+    if [[ ! -f "${MAGENTOROOT}/.htaccess" ]]
+    then
+        cat <<EOF > "${MAGENTOROOT}/.htaccess"
 ############################################
 ## uncomment these lines for CGI mode
 ## make sure to specify the correct cgi php binary file name
@@ -569,18 +573,19 @@ EOF
 
 function getMediaOrigHtaccess()
 {
-    if [ ! -f "${MAGENTOROOT}/get.php" ]
+    if [[ ! -f "${MAGENTOROOT}/get.php" ]]
     then
         return;
     fi
 
-    if [ ! -f "${MAGENTOROOT}/media/.htaccess.merchant" -a -f "${MAGENTOROOT}/media/.htaccess" ]
+    if [[ ! -f "${MAGENTOROOT}/media/.htaccess.merchant" && -f "${MAGENTOROOT}/media/.htaccess" ]]
     then
         mv "${MAGENTOROOT}/media/.htaccess" "${MAGENTOROOT}/media/.htaccess.merchant"
     fi
 
-    if [ ! -f "${MAGENTOROOT}/media/.htaccess" ]; then
-        cat << 'EOF' > "${MAGENTOROOT}/media/.htaccess"
+    if [[ ! -f "${MAGENTOROOT}/media/.htaccess" ]]
+    then
+        cat <<EOF > "${MAGENTOROOT}/media/.htaccess"
 Options All -Indexes
 <IfModule mod_php5.c>
 php_flag engine 0
@@ -614,12 +619,14 @@ EOF
 
 function getOrigLocalXml()
 {
-    if [ ! -f "${MAGENTOROOT}/app/etc/local.xml.merchant" -a -f "${MAGENTOROOT}/app/etc/local.xml" ]; then
+    if [[ ! -f "${MAGENTOROOT}/app/etc/local.xml.merchant" && -f "${MAGENTOROOT}/app/etc/local.xml" ]]
+    then
         mv "${MAGENTOROOT}/app/etc/local.xml" "${MAGENTOROOT}/app/etc/local.xml.merchant"
     fi
 
-    if [ ! -f "${MAGENTOROOT}/app/etc/local.xml" ]; then
-        cat << 'EOF' > "${MAGENTOROOT}/app/etc/local.xml"
+    if [[ ! -f "${MAGENTOROOT}/app/etc/local.xml" ]]
+    then
+        cat <<EOF > "${MAGENTOROOT}/app/etc/local.xml"
 <?xml version="1.0"?>
 <!--
 /**
@@ -695,12 +702,14 @@ EOF
 
 function getOrigEnterpriseXml()
 {
-    if [ ! -f "${MAGENTOROOT}/app/etc/enterprise.xml.merchant" -a -f "${MAGENTOROOT}/app/etc/enterprise.xml" ]; then
+    if [[ ! -f "${MAGENTOROOT}/app/etc/enterprise.xml.merchant" && -f "${MAGENTOROOT}/app/etc/enterprise.xml" ]]
+    then
         mv "${MAGENTOROOT}/app/etc/enterprise.xml" "${MAGENTOROOT}/app/etc/enterprise.xml.merchant"
     fi
 
-    if [ ! -f "${MAGENTOROOT}/app/etc/enterprise.xml" ]; then
-        cat << 'EOF' > ${MAGENTOROOT}/app/etc/enterprise.xml
+    if [[ ! -f "${MAGENTOROOT}/app/etc/enterprise.xml" ]]
+    then
+        cat <<EOF > "${MAGENTOROOT}/app/etc/enterprise.xml"
 <?xml version='1.0' encoding="utf-8" ?>
 <!--
 /**
@@ -755,12 +764,14 @@ EOF
 
 function getOrigIndex()
 {
-    if [ ! -f "${MAGENTOROOT}/index.php.merchant" -a -f "${MAGENTOROOT}/index.php" ]; then
+    if [[ ! -f "${MAGENTOROOT}/index.php.merchant" && -f "${MAGENTOROOT}/index.php" ]]
+    then
         mv "${MAGENTOROOT}/index.php" "${MAGENTOROOT}/index.php.merchant"
     fi
 
-    if [ ! -f "${MAGENTOROOT}/index.php" ]; then
-        cat << 'EOF' > index.php
+    if [[ ! -f "${MAGENTOROOT}/index.php" ]]
+    then
+        cat <<EOF > index.php
 <?php
 /**
  * Magento Enterprise Edition
@@ -807,33 +818,33 @@ error_reporting(E_ALL | E_STRICT);
  */
 define('MAGENTO_ROOT', getcwd());
 
-$compilerConfig = MAGENTO_ROOT . '/includes/config.php';
-if (file_exists($compilerConfig)) {
-    include $compilerConfig;
+\$compilerConfig = MAGENTO_ROOT . '/includes/config.php';
+if (file_exists(\$compilerConfig)) {
+    include \$compilerConfig;
 }
 
-$mageFilename = MAGENTO_ROOT . '/app/Mage.php';
-$maintenanceFile = 'maintenance.flag';
+\$mageFilename = MAGENTO_ROOT . '/app/Mage.php';
+\$maintenanceFile = 'maintenance.flag';
 
-if (!file_exists($mageFilename)) {
+if (!file_exists(\$mageFilename)) {
     if (is_dir('downloader')) {
         header("Location: downloader");
     } else {
-        echo $mageFilename, " was not found";
+        echo \$mageFilename, " was not found";
     }
     exit;
 }
 
-if (file_exists($maintenanceFile)) {
+if (file_exists(\$maintenanceFile)) {
     include_once dirname(__FILE__) . '/errors/503.php';
     exit;
 }
 
-require_once $mageFilename;
+require_once \$mageFilename;
 
 #Varien_Profiler::enable();
 
-if (isset($_SERVER['MAGE_IS_DEVELOPER_MODE'])) {
+if (isset(\$_SERVER['MAGE_IS_DEVELOPER_MODE'])) {
     Mage::setIsDeveloperMode(true);
 }
 
@@ -842,12 +853,12 @@ ini_set('display_errors', 1);
 umask(0);
 
 /* Store or website code */
-$mageRunCode = isset($_SERVER['MAGE_RUN_CODE']) ? $_SERVER['MAGE_RUN_CODE'] : '';
+\$mageRunCode = isset(\$_SERVER['MAGE_RUN_CODE']) ? \$_SERVER['MAGE_RUN_CODE'] : '';
 
 /* Run store or run website */
-$mageRunType = isset($_SERVER['MAGE_RUN_TYPE']) ? $_SERVER['MAGE_RUN_TYPE'] : 'store';
+\$mageRunType = isset(\$_SERVER['MAGE_RUN_TYPE']) ? \$_SERVER['MAGE_RUN_TYPE'] : 'store';
 
-Mage::run($mageRunCode, $mageRunType);
+Mage::run(\$mageRunCode, \$mageRunType);
 
 EOF
 
@@ -872,7 +883,7 @@ function doFileReconfigure()
 ####################################################################################################
 function cleanInstall()
 {
-    if [ -f "${MAGENTOROOT}/app/etc/local.xml" ]
+    if [[ -f "${MAGENTOROOT}/app/etc/local.xml" ]]
     then
         echo "Magento already installed, remove local.xml file to reinstall" >&2
         exit 1;
@@ -908,12 +919,12 @@ function gitAdd()
 
 function gitAddQuiet()
 {
-    if [ -d ".git" ]
+    if [[ -d ".git" ]]
     then
         rm -rf .git
     fi
 
-    if [ -f ".gitignore" ]
+    if [[ -f ".gitignore" ]]
     then
         mv -f .gitignore .gitignore.merchant
     fi
@@ -957,7 +968,8 @@ GIT_IGNORE_EOF
 #   Parse options and set environment.
 OPTIONS=`getopt -o wfrcm:h:D:u:p:b: -l help,without-config,force,reconfigure,clean-install,mode:,host:,database:,user:,password:,base-url: -n "$0" -- "$@"`
 
-if [ $? != 0 ] ; then
+if [[ $? != 0 ]]
+then
     echo "Failed parsing options." >&2
     echo
     showHelp
@@ -1007,7 +1019,7 @@ case "$MODE" in
         extractCode
         doFileReconfigure
         gitAdd
-        mkdir -pm 02777 "${MAGENTOROOT}/media" "${MAGENTOROOT}/var"
+        mkdir -pm 02777 "${MAGENTOROOT}/var"
         ;;
 
     # --mode db
@@ -1025,7 +1037,7 @@ case "$MODE" in
         doFileReconfigure
         # Spawn process to handle GIT wrapper with immediate return
         #   to work in background while the DB load runs.
-        (gitAddQuiet; mkdir -pm 02777 "${MAGENTOROOT}/media" "${MAGENTOROOT}/var")&
+        (gitAddQuiet; mkdir -pm 02777 "${MAGENTOROOT}/var")&
         createDb
         restoreDb
         doDbReconfigure
