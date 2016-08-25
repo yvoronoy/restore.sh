@@ -239,7 +239,6 @@ function doDbReconfigure()
     setConfigValue 'dev/log/exception_file' 'exception_dev.log'
     setConfigValue 'dev/log/file' 'system_dev.log'
 
-#     runMysqlQuery "DELETE FROM ${DBNAME}.${TABLE_PREFIX}core_config_data WHERE path LIKE 'web/cookie/%'"
     setConfigValue 'web/cookie/cookie_domain' ''
     setConfigValue 'web/cookie/cookie_path' ''
     setConfigValue 'web/cookie/cookie_lifetime' '0'
@@ -270,7 +269,7 @@ function doDbReconfigure()
         USER_ID=$(echo "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
     fi
 
-    runMysqlQuery "UPDATE {TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
 
     runMysqlQuery "UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
 
@@ -325,7 +324,8 @@ function getLocalMerchantXmlValues()
     fi
 }
 
-getLocalXmlValue() {
+getLocalXmlValue()
+{
     PARAMVALUE=$(sed -n -e "s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p" "${MAGENTOROOT}/app/etc/local.xml.merchant" | head -n 1)
 }
 
