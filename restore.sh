@@ -27,8 +27,6 @@ FILENAME_DB_DUMP=
 SQLDUMPFILE=
 
 DEBUG_MODE=0
-DEBUG_KEY=
-DEBUG_VAL=
 
 MAGENTOROOT="${PWD}"
 
@@ -326,7 +324,20 @@ function getLocalMerchantXmlValues()
 
 getLocalXmlValue()
 {
-    PARAMVALUE=$(sed -n -e "s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p" "${MAGENTOROOT}/app/etc/local.xml.merchant" | head -n 1)
+    # First look for value surrounded by "CDATA" construct.
+    LOCAL_XML_SEARCH="s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p"
+    debug "local XML search" "${LOCAL_XML_SEARCH}"
+    PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${MAGENTOROOT}/app/etc/local.xml.merchant" | head -n 1)
+    debug "local XML found" "${PARAMVALUE}"
+
+    # If not found then try searching without.
+    if [[ -z "${PARAMVALUE}" ]]
+    then
+        LOCAL_XML_SEARCH="s/.*<${1}>\(.*\)<\/${1}>.*/\1/p"
+        debug "local XML search" "${LOCAL_XML_SEARCH}"
+        PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${MAGENTOROOT}/app/etc/local.xml.merchant" | head -n 1)
+        debug "local XML found" "${PARAMVALUE}"
+    fi
 }
 
 function runMysqlQuery()
@@ -341,7 +352,7 @@ function debug()
         return
     fi
 
-    echo "KEY: ${1} VALUE: ${2}"
+    echo "KEY: ${1}  VALUE: ${2}"
 }
 
 function getOrigHtaccess()
