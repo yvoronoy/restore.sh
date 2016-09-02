@@ -6,6 +6,7 @@
 - The added and commented out code is a start at adding/changing the existing table name prefix. Table prefix handling is incomplete.
 - Added options for setting administrator's email and site language.
 - Added automatic restoring of logs archive if it exists.
+- Deployment caching is shut off.
 
 These changes have been tested with Ubuntu 14.04 Server and Debian 8.
 
