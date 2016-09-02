@@ -24,7 +24,6 @@ INSTALL_DATE=
 
 FILENAME_CODE_DUMP=
 FILENAME_DB_DUMP=
-SQLDUMPFILE=
 
 DEBUG_MODE=0
 
@@ -32,6 +31,7 @@ MAGENTOROOT="${PWD}"
 
 CONFIG_FILE_NAME=".restore.conf"
 DEPLOYMENT_DIR_NAME=$(basename "$MAGENTOROOT")
+LOCALE_CODE=en_US
 FORCE_RESTORE=0
 
 
@@ -56,6 +56,7 @@ function showHelp()
     echo "    -u, --user            DB user name"
     echo "    -p, --password        DB password"
     echo "    -b, --base-url        Base URL for this deployment host."
+    echo "    -l, --locale          \"base/locale/code\" configuration value. Defaults to \"en_US\"."
     echo ""
     echo "This script assumes it is being run from the new deployment directory with merchant backup files."
     echo ""
@@ -121,6 +122,8 @@ function initVariables()
     BASE_URL="${OPT_BASE_URL:-$BASE_URL}"
     BASE_URL="${BASE_URL}${DEPLOYMENT_DIR_NAME}/"
 
+    LOCALE_CODE="${OPT_LOCALE_CODE:-$LOCALE_CODE}"
+
     echo ""
     echo "Check parameters:"
     echo "DB host is: $DBHOST"
@@ -130,6 +133,7 @@ function initVariables()
 #   echo "Additional table prefix: $DEV_TABLE_PREFIX"
     echo "Full base url is: $BASE_URL"
     echo "Admin email is: $ADMIN_EMAIL"
+    echo "Locale code is: $LOCALE_CODE"
 
     if [[ ${FORCE_RESTORE} -eq 0 ]]
     then
@@ -160,20 +164,29 @@ function extractCode()
     if which pv > /dev/null; then
         echo ":"
         case "$FILENAME_CODE_DUMP" in
-            *.tar.gz|*.tgz)         pv -B 16k "$FILENAME_CODE_DUMP" | tar zxf - ;;
-            *.tar.bz2|*.tbz2|*.tbz) pv -B 16k "$FILENAME_CODE_DUMP" | tar jxf - ;;
-            *.gz)        gunzip -k "$FILENAME_CODE_DUMP";;
-            *.bz|*.bz2)  bunzip2 -k "$FILENAME_CODE_DUMP";;
-            *)           echo "\"$FILENAME_CODE_DUMP\" could not be extracted" >&2; exit 1;;
+            *.tar.gz|*.tgz)
+                pv -B 16k "$FILENAME_CODE_DUMP" | tar zxf - 2>/dev/null ;;
+            *.tar.bz2|*.tbz2|*.tbz)
+                pv -B 16k "$FILENAME_CODE_DUMP" | tar jxf - 2>/dev/null ;;
+            *.gz)
+                gunzip -k "$FILENAME_CODE_DUMP" ;;
+            *.bz|*.bz2)
+                bunzip2 -k "$FILENAME_CODE_DUMP" ;;
+            *)
+                echo "\"$FILENAME_CODE_DUMP\" could not be extracted" >&2; exit 1 ;;
         esac
     else
         echo -n " - "
         # Modern versions of tar can automatically choose the decompression type when needed.
         case "$FILENAME_CODE_DUMP" in
-            *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)   tar xf "$FILENAME_CODE_DUMP";;
-            *.gz)        gunzip -k "$FILENAME_CODE_DUMP";;
-            *.bz|*.bz2)  bunzip2 -k "$FILENAME_CODE_DUMP";;
-            *)           echo "\"$FILENAME_CODE_DUMP\" could not be extracted" >&2; exit 1;;
+            *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
+                tar xf "$FILENAME_CODE_DUMP" ;;
+            *.gz)
+                gunzip -k "$FILENAME_CODE_DUMP" ;;
+            *.bz|*.bz2)
+                bunzip2 -k "$FILENAME_CODE_DUMP" ;;
+            *)
+                echo "\"$FILENAME_CODE_DUMP\" could not be extracted" >&2; exit 1 ;;
         esac
         echo "OK"
     fi
@@ -249,7 +262,7 @@ function doDbReconfigure()
     setConfigValue 'admin/security/session_cookie_lifetime' '0'
     setConfigValue 'admin/security/use_form_key' '0'
 
-    setConfigValue 'general/locale/code' 'en_US'
+    setConfigValue 'general/locale/code' "${LOCALE_CODE}"
 
 
     deleteFromConfigWhere "IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
@@ -270,6 +283,8 @@ function doDbReconfigure()
     runMysqlQuery "UPDATE ${TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
 
     runMysqlQuery "UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
+
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_cache_option SET value = 0 WHERE 1"
 
     echo "OK"
 }
@@ -977,7 +992,7 @@ GIT_IGNORE_EOF
 
 ####################################################################################################
 #   Parse options and set environment.
-OPTIONS=`getopt -o wfrcm:h:D:u:p:b: -l help,without-config,force,reconfigure,clean-install,mode:,host:,database:,user:,password:,base-url: -n "$0" -- "$@"`
+OPTIONS=`getopt -o frcm:h:D:u:p:b:l: -l help,without-config,force,reconfigure,clean-install,mode:,host:,database:,user:,password:,base-url:locale: -n "$0" -- "$@"`
 
 if [[ $? != 0 ]]
 then
@@ -1001,6 +1016,7 @@ while true; do
         -u|--user )             OPT_DBUSER="$2"; shift 2;;
         -p|--password )         OPT_DBPASS="$2"; shift 2;;
         -b|--base-url )         OPT_BASE_URL="$2"; shift 2;;
+        -l|--locale )           OPT_LOCALE_CODE="$2"; shift 2;;
         -- ) shift; break;;
         * ) echo "Internal getopt parse error!"; echo; showHelp; exit 1;;
     esac
