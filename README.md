@@ -21,23 +21,25 @@ It restores dump files created by Magento Support module or backup.sh script:
 ## Options
 ```
 Usage: ./restore.sh [option]
-    --help                show available params for script (this screen)
-    -f, --force           install without check step
-    -r, --reconfigure     ReConfigure current magento instance
-    -c, --clean-install   Standard install procedure through CLI
-    -m, --mode            must have one of the following:
+    -H, --help            Show available params for script (this screen).
+    -f, --force           Install without pause to check data.
+    -r, --reconfigure     ReConfigure current Magento deployment.
+    -c, --clean-install   Standard fresh install procedure through CLI.
+    -m, --mode            This must have one of the following:
                           "reconfigure", "clean-install", "code", or "db"
                           The first two are optional usages of the previous two options.
                           "code" tells the script to only decompress the code, and
                           "db" to only move the data into the database.
-    -h, --host            DB host IP address, defaults to "localhost"
-    -D, --database        Database or schema name, defaults to current directory name
-    -u, --user            DB user name
+    -h, --host            DB host IP address, defaults to "localhost".
+    -D, --database        Database or schema name, defaults to current directory name.
+    -u, --user            DB user name.
     -p, --password        DB password
     -b, --base-url        Base URL for this deployment host.
+    -e, --email           Admin email address.
+    -l, --locale          "base/locale/code" configuration value. Defaults to "en_US".
 ```
 
-This script assumes it is being run from the new deployment directory with merchant backup files.
+This script assumes it is being run from the new deployment directory with the merchant's backup files.
 
 Your "~/.restore.conf" file must be manually created in your home directory.
 
@@ -46,23 +48,26 @@ Missing entries are treated as empty strings.
 In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used. Digits are allowed as a DB name.
 
 ## Example
-This is the contents of my "~/.restore.conf" that is running on a VirtualBox instance of Ubuntu 14.04 Server:
+This is the contents of my "~/.restore.conf" that is running on a VirtualBox instance of Debian 8:
 ```
+DBHOST=localhost
 DBUSER=magento
 DBPASS=magpass
-BASE_URL=http://192.168.56.131/
+BASE_URL=http://192.168.56.106/
+ADMIN_EMAIL=rwoodbury@magento.com
 ```
 
 Say you're working on SUPEE-9999. Place your dump files and this script in a directory inside your working web root, say "/var/www/9999/". You should see something like this (and type "n" or "no" to cancel the process):
 ```
-reid@u14p55m56a:/var/www/9999$ ./restore.sh
-
+reid@d8p56m56a:/var/www/9999$ ./restore.sh
 Check parameters:
 DB host is: localhost
 DB name is: 9999
 DB user is: magento
 DB pass is: magpass
-Full base url is: http://192.168.56.131/9999/
+Full base url is: http://192.168.56.106/9999/
+Admin email is: rwoodbury@magento.com
+Locale code is: en_US
 Continue? [Y/n]: n
 Interrupted by user, exiting...
 reid@u14p55m56a:/var/www/9999$

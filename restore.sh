@@ -15,15 +15,11 @@ DBNAME=
 DBUSER=
 DBPASS=
 BASE_URL=
-ADMIN_EMAIL=
 # DEV_TABLE_PREFIX=
 
 TABLE_PREFIX=
 CRYPT_KEY=
 INSTALL_DATE=
-
-FILENAME_CODE_DUMP=
-FILENAME_DB_DUMP=
 
 DEBUG_MODE=0
 
@@ -31,6 +27,7 @@ MAGENTOROOT="${PWD}"
 
 CONFIG_FILE_NAME=".restore.conf"
 DEPLOYMENT_DIR_NAME=$(basename "$MAGENTOROOT")
+ADMIN_EMAIL=
 LOCALE_CODE=en_US
 FORCE_RESTORE=0
 
@@ -42,23 +39,24 @@ function showHelp()
 {
     echo "Magento Deployment Restore Script"
     echo "Usage: ${0} [option]"
-    echo "    --help                show available params for script (this screen)"
-    echo "    -f, --force           install without check step"
-    echo "    -r, --reconfigure     ReConfigure current magento instance"
-    echo "    -c, --clean-install   Standard install procedure through CLI"
-    echo "    -m, --mode            must have one of the following:"
+    echo "    -H, --help            Show available params for script (this screen)."
+    echo "    -f, --force           Install without pause to check data."
+    echo "    -r, --reconfigure     ReConfigure current Magento deployment."
+    echo "    -c, --clean-install   Standard fresh install procedure through CLI."
+    echo "    -m, --mode            This must have one of the following:"
     echo "                          \"reconfigure\", \"clean-install\", \"code\", or \"db\""
     echo "                          The first two are optional usages of the previous two options."
     echo "                          \"code\" tells the script to only decompress the code, and"
     echo "                          \"db\" to only move the data into the database."
-    echo "    -h, --host            DB host IP address, defaults to \"localhost\""
-    echo "    -D, --database        Database or schema name, defaults to current directory name"
-    echo "    -u, --user            DB user name"
+    echo "    -h, --host            DB host IP address, defaults to \"localhost\"."
+    echo "    -D, --database        Database or schema name, defaults to current directory name."
+    echo "    -u, --user            DB user name."
     echo "    -p, --password        DB password"
     echo "    -b, --base-url        Base URL for this deployment host."
+    echo "    -e, --email           Admin email address."
     echo "    -l, --locale          \"base/locale/code\" configuration value. Defaults to \"en_US\"."
     echo ""
-    echo "This script assumes it is being run from the new deployment directory with merchant backup files."
+    echo "This script assumes it is being run from the new deployment directory with the merchant's backup files."
     echo ""
     echo "Your \"~/${CONFIG_FILE_NAME}\" file must be manually created in your home directory."
     echo ""
@@ -75,7 +73,7 @@ function showHelp()
     echo "DBNAME=rwoodbury_test"
     echo "DBUSER=rwoodbury"
     echo "DBPASS="
-    echo "BASE_URL=http://sparta.corp.magento.com/dev/rwoodbury/"
+    echo "BASE_URL=http://web1.sparta.corp.magento.com/dev/rwoodbury/"
     echo ""
 }
 
@@ -122,9 +120,10 @@ function initVariables()
     BASE_URL="${OPT_BASE_URL:-$BASE_URL}"
     BASE_URL="${BASE_URL}${DEPLOYMENT_DIR_NAME}/"
 
+    ADMIN_EMAIL="${OPT_ADMIN_EMAIL:-$ADMIN_EMAIL}"
+
     LOCALE_CODE="${OPT_LOCALE_CODE:-$LOCALE_CODE}"
 
-    echo ""
     echo "Check parameters:"
     echo "DB host is: $DBHOST"
     echo "DB name is: $DBNAME"
@@ -140,8 +139,8 @@ function initVariables()
         echo -n "Continue? [Y/n]: "
         read CONFIRM
 
-        case "$CONFIRM" in
-            [Nn][Oo]?) echo "Interrupted by user, exiting..."; exit;;
+        case "${CONFIRM}" in
+            [Nn]|[Nn][Oo]) echo "Interrupted by user, exiting..."; exit ;;
         esac
     fi
 }
@@ -149,53 +148,75 @@ function initVariables()
 ####################################################################################################
 function extractCode()
 {
-    echo -n "Extracting code"
+    FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2> /dev/null | grep -v '\.logs\.' | grep -v '\.sql\.' | head -n1)
 
-    FILENAME_CODE_DUMP=$(ls -1 *.tar.gz *.tgz *.tar.bz2 *.tbz2 *.tbz 2> /dev/null | grep -v 'logs.tar.gz' | head -n1)
+    debug "Code dump Filename" "$FILENAME"
 
-    debug "Code dump Filename" "$FILENAME_CODE_DUMP"
-
-    if [[ ! -f "$FILENAME_CODE_DUMP" ]]
+    if [[ ! -f "$FILENAME" ]]
     then
-        echo "\"$FILENAME_CODE_DUMP\" is not a valid file" >&2
+        echo "\"$FILENAME\" is not a valid file" >&2
         exit 1
     fi
 
+    echo -n "Extracting code"
+
     if which pv > /dev/null; then
         echo ":"
-        case "$FILENAME_CODE_DUMP" in
+        case "$FILENAME" in
             *.tar.gz|*.tgz)
-                pv -B 16k "$FILENAME_CODE_DUMP" | tar zxf - 2>/dev/null ;;
+                pv -B 16k "$FILENAME" | tar zxf - 2>/dev/null ;;
             *.tar.bz2|*.tbz2|*.tbz)
-                pv -B 16k "$FILENAME_CODE_DUMP" | tar jxf - 2>/dev/null ;;
+                pv -B 16k "$FILENAME" | tar jxf - 2>/dev/null ;;
             *.gz)
-                gunzip -k "$FILENAME_CODE_DUMP" ;;
+                gunzip -k "$FILENAME" ;;
             *.bz|*.bz2)
-                bunzip2 -k "$FILENAME_CODE_DUMP" ;;
+                bunzip2 -k "$FILENAME" ;;
             *)
-                echo "\"$FILENAME_CODE_DUMP\" could not be extracted" >&2; exit 1 ;;
+                echo "\"$FILENAME\" could not be extracted" >&2; exit 1 ;;
         esac
     else
         echo -n " - "
         # Modern versions of tar can automatically choose the decompression type when needed.
-        case "$FILENAME_CODE_DUMP" in
+        case "$FILENAME" in
             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
-                tar xf "$FILENAME_CODE_DUMP" ;;
+                tar xf "$FILENAME" ;;
             *.gz)
-                gunzip -k "$FILENAME_CODE_DUMP" ;;
+                gunzip -k "$FILENAME" ;;
             *.bz|*.bz2)
-                bunzip2 -k "$FILENAME_CODE_DUMP" ;;
+                bunzip2 -k "$FILENAME" ;;
             *)
-                echo "\"$FILENAME_CODE_DUMP\" could not be extracted" >&2; exit 1 ;;
+                echo "\"$FILENAME\" could not be extracted" >&2; exit 1 ;;
         esac
         echo "OK"
     fi
 
-    echo -n "Updating permissions - "
+    mkdir -pm 02777 "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
+
+    # Also do the log archive if it exists.
+    FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '.logs.' | head -n1)
+    if [[ -f "$FILENAME" ]]
+    then
+        echo -n "Extracting log files - "
+        case "$FILENAME" in
+            *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
+                tar xf "$FILENAME" 2>/dev/null ;;
+            *.gz)
+                gunzip -k "$FILENAME" ;;
+            *.bz|*.bz2)
+                bunzip2 -k "$FILENAME" ;;
+            *)
+                echo "\"$FILENAME\" could not be extracted" >&2; exit 1 ;;
+        esac
+        echo "OK"
+    fi
+
+    echo -n "Updating permissions and cleanup - "
 
     find . -type d -exec chmod a+rx {} \;
     chmod -R 02777 "${MAGENTOROOT}/app/etc"
-    mkdir -pm 02777 "${MAGENTOROOT}/media"
+
+    # Remove confusing OS X garbage if any.
+    find . -name '._*' -exec rm {} \;
 
     echo "OK"
 }
@@ -212,11 +233,11 @@ function restoreDb()
 {
     echo -n "Restoring DB from dump"
 
-    FILENAME_DB_DUMP=$(ls -1 *.sql.* | head -n1)
+    FILENAME=$(ls -1 *.sql.* | head -n1)
 
-    debug "DB dump Filename" "$FILENAME_DB_DUMP"
+    debug "DB dump Filename" "$FILENAME"
 
-    if [[ ! -f "$FILENAME_DB_DUMP" ]]
+    if [[ ! -f "$FILENAME" ]]
     then
         echo "DB dump absent" >&2
         exit 1
@@ -225,10 +246,10 @@ function restoreDb()
     if which pv > /dev/null
     then
         echo ":"
-        pv "$FILENAME_DB_DUMP" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force $DBNAME 2>/dev/null
+        pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force $DBNAME 2>/dev/null
     else
         echo -n " - "
-        gunzip -c "$FILENAME_DB_DUMP" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force $DBNAME 2>/dev/null
+        gunzip -c "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force $DBNAME 2>/dev/null
         echo "OK"
     fi
 }
@@ -992,7 +1013,7 @@ GIT_IGNORE_EOF
 
 ####################################################################################################
 #   Parse options and set environment.
-OPTIONS=`getopt -o frcm:h:D:u:p:b:l: -l help,without-config,force,reconfigure,clean-install,mode:,host:,database:,user:,password:,base-url:locale: -n "$0" -- "$@"`
+OPTIONS=`getopt -o Hfrcm:h:D:u:p:b:e:l: -l help,force,reconfigure,clean-install,mode:,host:,database:,user:,password:,base-url:,email:,locale: -n "$0" -- "$@"`
 
 if [[ $? != 0 ]]
 then
@@ -1006,7 +1027,7 @@ eval set -- "$OPTIONS"
 
 while true; do
     case "$1" in
-        --help )                showHelp; exit 0;;
+        -H|--help )             showHelp; exit 0;;
         -f|--force )            FORCE_RESTORE=1; shift 1;;
         -r|--reconfigure )      MODE="reconfigure"; shift 1;;
         -c|--clean-install )    MODE="clean-install"; shift 1;;
@@ -1016,6 +1037,7 @@ while true; do
         -u|--user )             OPT_DBUSER="$2"; shift 2;;
         -p|--password )         OPT_DBPASS="$2"; shift 2;;
         -b|--base-url )         OPT_BASE_URL="$2"; shift 2;;
+        -e|--email )            OPT_ADMIN_EMAIL="$2"; shift 2;;
         -l|--locale )           OPT_LOCALE_CODE="$2"; shift 2;;
         -- ) shift; break;;
         * ) echo "Internal getopt parse error!"; echo; showHelp; exit 1;;
@@ -1025,33 +1047,38 @@ done
 
 ####################################################################################################
 # Execute.
+
+# Catch bad modes before initializing variables.
+case "$MODE" in
+    reconfigure|clean-install|code|db) ;;
+    '') ;;
+    *) echo "Bad mode."; echo; showHelp; exit 1 ;;
+esac
+
+initVariables
+
 case "$MODE" in
     # --reconfigure
-    'reconfigure')
-        initVariables
+    reconfigure)
         doFileReconfigure
         doDbReconfigure
         ;;
 
     # --clean-install
-    'clean-install')
-        initVariables
+    clean-install)
         cleanInstall
         gitAdd
         ;;
 
     # --mode code
-    'code')
-        initVariables
+    code)
         extractCode
         doFileReconfigure
         gitAdd
-        mkdir -pm 02777 "${MAGENTOROOT}/var"
         ;;
 
     # --mode db
-    'db')
-        initVariables
+    db)
         createDb
         restoreDb
         doDbReconfigure
@@ -1059,23 +1086,15 @@ case "$MODE" in
 
     # Empty "mode". Do everything.
     '')
-        initVariables
         extractCode
         doFileReconfigure
         # Spawn process to handle GIT wrapper with immediate return
         #   to work in background while the DB load runs.
-        (gitAddQuiet; mkdir -pm 02777 "${MAGENTOROOT}/var")&
+        (gitAddQuiet)&
         createDb
         restoreDb
         doDbReconfigure
         ;;
-
-    *)
-        echo "Bad mode."
-        echo
-        showHelp
-        exit 1
-
 esac
 
 exit 0
