@@ -4,6 +4,8 @@
 - Changed handling of configuration file so that values from the config file are always used but are overridden by values from the command line. All configuration values can be overwritten by their matching command line option. Where appropriate, options are similar to using "mysql" client.
 - Added modes to only process code or only import data. They are commented out as they are incomplete.
 - The added and commented out code is a start at adding/changing the existing table name prefix. Table prefix handling is incomplete.
+- Added options for setting administrator's email and site language.
+- Added automatic restoring of logs archive if it exists.
 
 These changes have been tested with Ubuntu 14.04 Server and Debian 8.
 
