@@ -212,11 +212,11 @@ function extractCode()
 
     echo -n "Updating permissions and cleanup - "
 
-    find . -type d -exec chmod a+rx {} \;
-    chmod -R 02777 "${MAGENTOROOT}/app/etc"
-
     # Remove confusing OS X garbage if any.
     find . -name '._*' -exec rm {} \;
+
+    find . -type d -exec chmod a+rx {} \;
+    chmod -R 02777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
 
     echo "OK"
 }
