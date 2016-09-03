@@ -18,6 +18,7 @@ These changes have been tested with Ubuntu 14.04 Server and Debian 8.
 This script is designed to be run from folder with Magento dumps.
 It restores dump files created by Magento Support module or backup.sh script:
 > code dump (for ex. 5a9cefe85f8e1ccc2a5191553f31ab82.201607061906.sql.gz)
+
 > DB dump (for ex. 5a9cefe85f8e1ccc2a5191553f31ab82.201607061906.tar.gz)
 
 ## Options
