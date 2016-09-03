@@ -28,7 +28,7 @@ MAGENTOROOT="${PWD}"
 CONFIG_FILE_NAME=".restore.conf"
 DEPLOYMENT_DIR_NAME=$(basename "$MAGENTOROOT")
 ADMIN_EMAIL=
-LOCALE_CODE=en_US
+LOCALE_CODE="en_US"
 FORCE_RESTORE=0
 
 
@@ -37,44 +37,50 @@ FORCE_RESTORE=0
 
 function showHelp()
 {
-    echo "Magento Deployment Restore Script"
-    echo "Usage: ${0} [option]"
-    echo "    -H, --help            Show available params for script (this screen)."
-    echo "    -f, --force           Install without pause to check data."
-    echo "    -r, --reconfigure     ReConfigure current Magento deployment."
-    echo "    -c, --clean-install   Standard fresh install procedure through CLI."
-    echo "    -m, --mode            This must have one of the following:"
-    echo "                          \"reconfigure\", \"clean-install\", \"code\", or \"db\""
-    echo "                          The first two are optional usages of the previous two options."
-    echo "                          \"code\" tells the script to only decompress the code, and"
-    echo "                          \"db\" to only move the data into the database."
-    echo "    -h, --host            DB host IP address, defaults to \"localhost\"."
-    echo "    -D, --database        Database or schema name, defaults to current directory name."
-    echo "    -u, --user            DB user name."
-    echo "    -p, --password        DB password"
-    echo "    -b, --base-url        Base URL for this deployment host."
-    echo "    -e, --email           Admin email address."
-    echo "    -l, --locale          \"base/locale/code\" configuration value. Defaults to \"en_US\"."
-    echo ""
-    echo "This script assumes it is being run from the new deployment directory with the merchant's backup files."
-    echo ""
-    echo "Your \"~/${CONFIG_FILE_NAME}\" file must be manually created in your home directory."
-    echo ""
-    echo "Missing entries are treated as empty strings."
-    echo ""
-    echo "In most cases, if the requested value is not included on the command line then"
-    echo "the corresponding value from the config file is used. In the special case"
-    echo "of the DB name, if the DB name is empty in the config file and none is entered"
-    echo "on the command line then the current working directory basename is used."
-    echo "Digits are allowed as a DB name."
-    echo ""
-    echo "Sample \"~/${CONFIG_FILE_NAME}\":"
-    echo "DBHOST=sparta-db"
-    echo "DBNAME=rwoodbury_test"
-    echo "DBUSER=rwoodbury"
-    echo "DBPASS="
-    echo "BASE_URL=http://web1.sparta.corp.magento.com/dev/rwoodbury/"
-    echo ""
+    cat <<ENDHELP
+Magento Deployment Restore Script
+Usage: ${0} [option]
+    -H, --help            Show available params for script (this screen).
+    -f, --force           Install without pause to check data.
+    -r, --reconfigure     ReConfigure current Magento deployment.
+    -c, --clean-install   Standard fresh install procedure through CLI.
+    -m, --mode            This must have one of the following:
+                          "reconfigure", "clean-install", "code", or "db"
+                          The first two are optional usages of the previous two options.
+                          "code" tells the script to only decompress the code, and
+                          "db" to only move the data into the database.
+    -h, --host            DB host IP address, defaults to "localhost".
+    -D, --database        Database or schema name, defaults to current directory name.
+    -u, --user            DB user name.
+    -p, --password        DB password
+    -b, --base-url        Base URL for this deployment host.
+    -e, --email           Admin email address.
+    -l, --locale          "base/locale/code" configuration value. Defaults to "en_US".
+
+This script assumes it is being run from the new deployment directory with the
+merchant's backup files.
+
+Your "~/${CONFIG_FILE_NAME}" file must be manually created in your home directory.
+
+Missing entries are treated as empty strings. In most cases, if the requested
+value is not included on the command line then the corresponding value from the
+config file is used. In the special case of the DB name, if the DB name is
+empty in the config file and none is entered on the command line then the
+current working directory basename is used. Digits are allowed as a DB name.
+
+Sample "~/${CONFIG_FILE_NAME}":
+DBHOST=sparta-db
+DBNAME=rwoodbury_test
+DBUSER=rwoodbury
+DBPASS=
+BASE_URL=http://web1.sparta.corp.magento.com/dev/rwoodbury/
+
+NOTE: OS X users will need to install a newer version of "getopt" from a
+repository like MacPorts:
+> sudo port install getopt
+
+ENDHELP
+
 }
 
 ####################################################################################################
@@ -124,15 +130,16 @@ function initVariables()
 
     LOCALE_CODE="${OPT_LOCALE_CODE:-$LOCALE_CODE}"
 
-    echo "Check parameters:"
-    echo "DB host is: $DBHOST"
-    echo "DB name is: $DBNAME"
-    echo "DB user is: $DBUSER"
-    echo "DB pass is: $DBPASS"
-#   echo "Additional table prefix: $DEV_TABLE_PREFIX"
-    echo "Full base url is: $BASE_URL"
-    echo "Admin email is: $ADMIN_EMAIL"
-    echo "Locale code is: $LOCALE_CODE"
+    cat <<ENDCHECK
+Check parameters:
+DB host is: $DBHOST
+DB name is: $DBNAME
+DB user is: $DBUSER
+DB pass is: $DBPASS
+Full base url is: $BASE_URL
+Admin email is: $ADMIN_EMAIL
+Locale code is: $LOCALE_CODE
+ENDCHECK
 
     if [[ ${FORCE_RESTORE} -eq 0 ]]
     then
@@ -216,6 +223,9 @@ function extractCode()
     find . -name '._*' -exec rm {} \;
 
     find . -type d -exec chmod a+rx {} \;
+
+    touch "${MAGENTOROOT}/var/log/exception_dev.log"
+    touch "${MAGENTOROOT}/var/log/system_dev.log"
     chmod -R 02777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
 
     echo "OK"
@@ -282,6 +292,8 @@ function doDbReconfigure()
     setConfigValue 'admin/security/password_lifetime' '9999'
     setConfigValue 'admin/security/session_cookie_lifetime' '0'
     setConfigValue 'admin/security/use_form_key' '0'
+
+    setConfigValue 'admin/dashboard/enable_charts' '0'
 
     setConfigValue 'general/locale/code' "${LOCALE_CODE}"
 
@@ -1090,7 +1102,7 @@ case "$MODE" in
         doFileReconfigure
         # Spawn process to handle GIT wrapper with immediate return
         #   to work in background while the DB load runs.
-        (gitAddQuiet)&
+        ( gitAddQuiet ) &
         createDb
         restoreDb
         doDbReconfigure

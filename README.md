@@ -6,7 +6,7 @@
 - The added and commented out code is a start at adding/changing the existing table name prefix. Table prefix handling is incomplete.
 - Added options for setting administrator's email and site language.
 - Added automatic restoring of logs archive if it exists.
-- Deployment caching is shut off.
+- A number of automated features, such as caching, are turned off to aid in debugging.
 
 These changes have been tested with Ubuntu 14.04 Server and Debian 8.
 
@@ -18,7 +18,6 @@ These changes have been tested with Ubuntu 14.04 Server and Debian 8.
 This script is designed to be run from folder with Magento dumps.
 It restores dump files created by Magento Support module or backup.sh script:
 > code dump (for ex. 5a9cefe85f8e1ccc2a5191553f31ab82.201607061906.sql.gz)
-
 > DB dump (for ex. 5a9cefe85f8e1ccc2a5191553f31ab82.201607061906.tar.gz)
 
 ## Options
@@ -42,13 +41,12 @@ Usage: ./restore.sh [option]
     -l, --locale          "base/locale/code" configuration value. Defaults to "en_US".
 ```
 
-This script assumes it is being run from the new deployment directory with the merchant's backup files.
+This script assumes it is being run from the new deployment directory with the
+merchant's backup files.
 
 Your "~/.restore.conf" file must be manually created in your home directory.
 
-Missing entries are treated as empty strings.
-
-In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used. Digits are allowed as a DB name.
+Missing entries are treated as empty strings. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used. Digits are allowed as a DB name.
 
 ## Example
 This is the contents of my "~/.restore.conf" that is running on a VirtualBox instance of Debian 8:
@@ -78,3 +76,7 @@ reid@u14p55m56a:/var/www/9999$
 
 # Progress bar
 In order to see a progress bar while restoring a dump you will need to install the `pv` utility.
+
+# OS X
+OS X users will need to install a newer version of `getopt` from a repository like MacPorts:
+`> sudo port install getopt`
