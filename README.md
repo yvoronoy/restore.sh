@@ -79,4 +79,5 @@ In order to see a progress bar while restoring a dump you will need to install t
 
 # OS X
 OS X users will need to install a newer version of `getopt` from a repository like MacPorts:
+
 `> sudo port install getopt`
