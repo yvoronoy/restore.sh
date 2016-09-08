@@ -224,6 +224,7 @@ function extractCode()
 
     find . -type d -exec chmod a+rx {} \;
 
+    mkdir -p "${MAGENTOROOT}/var/log/"
     touch "${MAGENTOROOT}/var/log/exception_dev.log"
     touch "${MAGENTOROOT}/var/log/system_dev.log"
     chmod -R 02777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
@@ -271,21 +272,7 @@ function doDbReconfigure()
 
     getLocalMerchantXmlValues
 
-    setConfigValue 'web/secure/base_url' "${BASE_URL}"
-    setConfigValue 'web/unsecure/base_url' "${BASE_URL}"
-
-# From MDM.
-    setConfigValue 'dev/css/merge_css_files' '0'
-    setConfigValue 'dev/js/merge_files' '0'
-    setConfigValue 'dev/log/active' '1'
-    setConfigValue 'dev/log/exception_file' 'exception_dev.log'
-    setConfigValue 'dev/log/file' 'system_dev.log'
-
-    setConfigValue 'web/cookie/cookie_domain' ''
-    setConfigValue 'web/cookie/cookie_path' ''
-    setConfigValue 'web/cookie/cookie_lifetime' '0'
-
-    setConfigValue 'web/secure/use_in_adminhtml' '0'
+    setConfigValue 'admin/dashboard/enable_charts' '0'
 
     setConfigValue 'admin/security/lockout_failures' '0'
     setConfigValue 'admin/security/password_is_forced' '0'
@@ -293,10 +280,23 @@ function doDbReconfigure()
     setConfigValue 'admin/security/session_cookie_lifetime' '0'
     setConfigValue 'admin/security/use_form_key' '0'
 
-    setConfigValue 'admin/dashboard/enable_charts' '0'
+    setConfigValue 'admin/startup/page' 'system/config'
+
+    setConfigValue 'dev/css/merge_css_files' '0'
+    setConfigValue 'dev/js/merge_files' '0'
+    setConfigValue 'dev/log/active' '1'
+    setConfigValue 'dev/log/exception_file' 'exception_dev.log'
+    setConfigValue 'dev/log/file' 'system_dev.log'
 
     setConfigValue 'general/locale/code' "${LOCALE_CODE}"
 
+    setConfigValue 'web/cookie/cookie_domain' ''
+    setConfigValue 'web/cookie/cookie_path' ''
+    setConfigValue 'web/cookie/cookie_lifetime' '0'
+
+    setConfigValue 'web/secure/base_url' "${BASE_URL}"
+    setConfigValue 'web/secure/use_in_adminhtml' '0'
+    setConfigValue 'web/unsecure/base_url' "${BASE_URL}"
 
     deleteFromConfigWhere "IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
 
@@ -334,25 +334,25 @@ function deleteFromConfigWhere()
 }
 
 ####################################################################################################
-function updateLocalXml()
-{
-    getLocalMerchantXmlValues
-
-    updateLocalXmlParam "key" "$CRYPT_KEY"
-    updateLocalXmlParam "date" "$INSTALL_DATE"
-    updateLocalXmlParam "table_prefix" "$TABLE_PREFIX"
-    updateLocalXmlParam "username" "$DBUSER"
-    updateLocalXmlParam "password" "$DBPASS"
-    updateLocalXmlParam "dbname" "$DBNAME"
-    updateLocalXmlParam "host" "$DBHOST"
-    updateLocalXmlParam "frontName" "admin"
-}
-
-function updateLocalXmlParam()
-{
-    sed "s/<${1}><\!\[CDATA\[.*\]\]><\/${1}>/<${1}><\!\[CDATA\[${2}\]\]><\/${1}>/" "${MAGENTOROOT}/app/etc/local.xml" > "${MAGENTOROOT}/app/etc/local.TMP"
-    mv -f "${MAGENTOROOT}/app/etc/local.TMP" "${MAGENTOROOT}/app/etc/local.xml"
-}
+# function updateLocalXml()
+# {
+#     getLocalMerchantXmlValues
+#
+#     updateLocalXmlParam "key" "$CRYPT_KEY"
+#     updateLocalXmlParam "date" "$INSTALL_DATE"
+#     updateLocalXmlParam "table_prefix" "$TABLE_PREFIX"
+#     updateLocalXmlParam "username" "$DBUSER"
+#     updateLocalXmlParam "password" "$DBPASS"
+#     updateLocalXmlParam "dbname" "$DBNAME"
+#     updateLocalXmlParam "host" "$DBHOST"
+#     updateLocalXmlParam "frontName" "admin"
+# }
+#
+# function updateLocalXmlParam()
+# {
+#     sed "s/<${1}><\!\[CDATA\[.*\]\]><\/${1}>/<${1}><\!\[CDATA\[${2}\]\]><\/${1}>/" "${MAGENTOROOT}/app/etc/local.xml" > "${MAGENTOROOT}/app/etc/local.TMP"
+#     mv -f "${MAGENTOROOT}/app/etc/local.TMP" "${MAGENTOROOT}/app/etc/local.xml"
+# }
 
 function getLocalMerchantXmlValues()
 {
@@ -374,7 +374,7 @@ getLocalXmlValue()
 {
     # First look for value surrounded by "CDATA" construct.
     LOCAL_XML_SEARCH="s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p"
-    debug "local XML search" "${LOCAL_XML_SEARCH}"
+    debug "local XML search string" "${LOCAL_XML_SEARCH}"
     PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${MAGENTOROOT}/app/etc/local.xml.merchant" | head -n 1)
     debug "local XML found" "${PARAMVALUE}"
 
@@ -382,7 +382,7 @@ getLocalXmlValue()
     if [[ -z "${PARAMVALUE}" ]]
     then
         LOCAL_XML_SEARCH="s/.*<${1}>\(.*\)<\/${1}>.*/\1/p"
-        debug "local XML search" "${LOCAL_XML_SEARCH}"
+        debug "local XML search string" "${LOCAL_XML_SEARCH}"
         PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${MAGENTOROOT}/app/etc/local.xml.merchant" | head -n 1)
         debug "local XML found" "${PARAMVALUE}"
     fi
@@ -685,6 +685,8 @@ function getOrigLocalXml()
 
     if [[ ! -f "${MAGENTOROOT}/app/etc/local.xml" ]]
     then
+        getLocalMerchantXmlValues
+
         cat <<EOF > "${MAGENTOROOT}/app/etc/local.xml"
 <?xml version="1.0"?>
 <!--
@@ -716,22 +718,22 @@ function getOrigLocalXml()
 <config>
     <global>
         <install>
-            <date><![CDATA[]]></date>
+            <date><![CDATA[${INSTALL_DATE}]]></date>
         </install>
         <crypt>
-            <key><![CDATA[]]></key>
+            <key><![CDATA[${CRYPT_KEY}]]></key>
         </crypt>
         <disable_local_modules>false</disable_local_modules>
         <resources>
             <db>
-                <table_prefix><![CDATA[]]></table_prefix>
+                <table_prefix><![CDATA[${TABLE_PREFIX}]]></table_prefix>
             </db>
             <default_setup>
                 <connection>
-                    <host><![CDATA[localhost]]></host>
-                    <username><![CDATA[root]]></username>
-                    <password><![CDATA[]]></password>
-                    <dbname><![CDATA[magento]]></dbname>
+                    <host><![CDATA[${DBHOST}]]></host>
+                    <username><![CDATA[${DBUSER}]]></username>
+                    <password><![CDATA[${DBPASS}]]></password>
+                    <dbname><![CDATA[${DBNAME}]]></dbname>
                     <initStatements><![CDATA[SET NAMES utf8]]></initStatements>
                     <model><![CDATA[mysql4]]></model>
                     <type><![CDATA[pdo_mysql]]></type>
@@ -889,7 +891,7 @@ if (!file_exists(\$mageFilename)) {
     if (is_dir('downloader')) {
         header("Location: downloader");
     } else {
-        echo \$mageFilename, " was not found";
+        echo \$mageFilename." was not found";
     }
     exit;
 }
@@ -934,7 +936,7 @@ function doFileReconfigure()
     getOrigLocalXml
     getOrigEnterpriseXml
     getOrigIndex
-    updateLocalXml
+#     updateLocalXml
 
     echo "OK"
 }
@@ -989,9 +991,9 @@ function gitAddQuiet()
     fi
 
     cat << 'GIT_IGNORE_EOF' > .gitignore
-media/
-var/
-.idea/
+/media/
+/var/
+/.idea/
 .svn/
 *.gz
 *.tgz
@@ -1006,14 +1008,9 @@ GIT_IGNORE_EOF
 
     git init >/dev/null 2>&1
 
-    OLD_GLOBIGNORE="$GLOBIGNORE"
-
-    # don't add files are are archive types or 'media' or 'var', etc.
-    GLOBIGNORE="./media:./var:.svn:.idea:*.gz:*.tgz:*.bz:*.bz2:*.tbz2:*.tbz:*.zip:*.tar"
-
-    git add ./.ht* .gitignore* * >/dev/null 2>&1
-
-    GLOBIGNORE="$OLD_GLOBIGNORE"
+    find . -type f -regextype posix-extended ! -regex \
+        '\./.git/.*|\./media/.*|\./var/.*|.*\.svn/.*|\./\.idea/.*|.*\.gz|.*\.tgz|.*\.bz|.*\.bz2|.*\.tbz2|.*\.tbz|.*\.zip|.*\.tar' \
+        -print0 | xargs -0 git add -f
 
     git commit -m "initial customer deployment" >/dev/null 2>&1
 }
