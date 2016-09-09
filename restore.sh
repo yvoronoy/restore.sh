@@ -220,9 +220,10 @@ function extractCode()
     echo -n "Updating permissions and cleanup - "
 
     # Remove confusing OS X garbage if any.
-    find . -name '._*' -exec rm {} \;
+    find . -name '._*' -print0 | xargs -0 rm
 
-    find . -type d -exec chmod a+rx {} \;
+    find . -type d -print0 | xargs -0 chmod a+rx
+    find . -type f -print0 | xargs -0 chmod 664
 
     mkdir -p "${MAGENTOROOT}/var/log/"
     touch "${MAGENTOROOT}/var/log/exception_dev.log"
@@ -385,6 +386,12 @@ getLocalXmlValue()
         debug "local XML search string" "${LOCAL_XML_SEARCH}"
         PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${MAGENTOROOT}/app/etc/local.xml.merchant" | head -n 1)
         debug "local XML found" "${PARAMVALUE}"
+
+        # Prevent disaster.
+        if [[ "${PARAMVALUE}" == '<![CDATA[]]>' ]]
+        then
+            PARAMVALUE=''
+        fi
     fi
 }
 
