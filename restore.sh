@@ -223,7 +223,7 @@ function extractCode()
     find . -name '._*' -print0 | xargs -0 rm
 
     find . -type d -print0 | xargs -0 chmod a+rx
-    find . -type f -print0 | xargs -0 chmod 664
+    find . -type f -print0 | xargs -0 chmod 644
 
     mkdir -p "${MAGENTOROOT}/var/log/"
     touch "${MAGENTOROOT}/var/log/exception_dev.log"
@@ -1083,7 +1083,6 @@ case "$MODE" in
     # --clean-install
     clean-install)
         cleanInstall
-        gitAdd
         ;;
 
     # --mode code
