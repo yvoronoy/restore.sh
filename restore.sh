@@ -987,11 +987,6 @@ function gitAdd()
 
 function gitAddQuiet()
 {
-    if [[ -d ".git" ]]
-    then
-        rm -rf .git
-    fi
-
     if [[ -f ".gitignore" ]]
     then
         mv -f .gitignore .gitignore.merchant
@@ -1012,6 +1007,11 @@ function gitAddQuiet()
 *.tar
 
 GIT_IGNORE_EOF
+
+    if [[ -d ".git" ]]
+    then
+        mv -f .git .git.merchant
+    fi
 
     git init >/dev/null 2>&1
 
