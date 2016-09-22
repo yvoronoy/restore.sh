@@ -27,9 +27,9 @@ Usage: ./restore.sh [option]
     -H, --help            Show available params for script (this screen).
     -f, --force           Install without pause to check data.
     -r, --reconfigure     ReConfigure current Magento deployment.
-    -c, --clean-install   Standard fresh install procedure through CLI.
+    -i, --install-only    Standard fresh install procedure through CLI.
     -m, --mode            This must have one of the following:
-                          "reconfigure", "clean-install", "code", or "db"
+                          "reconfigure", "install-only", "code", or "db"
                           The first two are optional usages of the previous two options.
                           "code" tells the script to only decompress the code, and
                           "db" to only move the data into the database.
