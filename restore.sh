@@ -25,7 +25,7 @@ DEBUG_MODE=0
 
 MAGENTOROOT="${PWD}"
 
-CONFIG_FILE_NAME=".restore.conf"
+CONFIG_FILE_NAME="restore.conf"
 DEPLOYMENT_DIR_NAME=$(basename "$MAGENTOROOT")
 ADMIN_EMAIL=
 LOCALE_CODE="en_US"
@@ -228,6 +228,7 @@ function extractCode()
     mkdir -p "${MAGENTOROOT}/var/log/"
     touch "${MAGENTOROOT}/var/log/exception_dev.log"
     touch "${MAGENTOROOT}/var/log/system_dev.log"
+    chmod -R 2777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
     chmod -R 2777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
 
     echo "OK"
@@ -921,7 +922,7 @@ function installOnly()
 {
     if [[ -f "${MAGENTOROOT}/app/etc/local.xml" ]]
     then
-        echo "Magento already installed, remove local.xml file to reinstall" >&2
+        echo "Magento already installed, remove app/etc/local.xml file to reinstall" >&2
         exit 1;
     fi
 
@@ -929,10 +930,13 @@ function installOnly()
 
     createDb
 
+    chmod 2777 "${MAGENTOROOT}/var"
     mkdir -p "${MAGENTOROOT}/var/log/"
+    chmod 2777 "${MAGENTOROOT}/var/log"
     touch "${MAGENTOROOT}/var/log/exception.log"
     touch "${MAGENTOROOT}/var/log/system.log"
-    chmod -R 2777 "${MAGENTOROOT}/var" "${MAGENTOROOT}/media" "${MAGENTOROOT}/app/etc"
+
+    chmod 2777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/media"
 
     php -f install.php -- --license_agreement_accepted yes \
         --locale en_US --timezone `php -r 'echo date_default_timezone_get();'` --default_currency USD \
@@ -942,8 +946,6 @@ function installOnly()
         --skip_url_validation yes \
         --admin_lastname Owner --admin_firstname Store --admin_email "${ADMIN_EMAIL}" \
         --admin_username admin --admin_password 123123q
-
-    doDbReconfigure
 }
 
 ####################################################################################################
@@ -990,7 +992,7 @@ GIT_IGNORE_EOF
         '\./.git/.*|\./media/.*|\./var/.*|.*\.svn/.*|\./\.idea/.*|.*\.gz|.*\.tgz|.*\.bz|.*\.bz2|.*\.tbz2|.*\.tbz|.*\.zip|.*\.tar' \
         -print0 | xargs -0 git add -f
 
-    git commit -m "initial customer deployment" >/dev/null 2>&1
+    git commit -m "initial merchant deployment" >/dev/null 2>&1
 }
 
 
@@ -1054,6 +1056,7 @@ case "$MODE" in
     # --install-only
     install-only)
         installOnly
+        doDbReconfigure
         # Add GIT repo if none exists.
         if [[ ! -d ".git" ]]
         then
