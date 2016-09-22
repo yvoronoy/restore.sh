@@ -43,9 +43,9 @@ Usage: ${0} [option]
     -H, --help            Show available params for script (this screen).
     -f, --force           Install without pause to check data.
     -r, --reconfigure     ReConfigure current Magento deployment.
-    -c, --clean-install   Standard fresh install procedure through CLI.
+    -i, --install-only    Standard fresh install procedure through CLI.
     -m, --mode            This must have one of the following:
-                          "reconfigure", "clean-install", "code", or "db"
+                          "reconfigure", "install-only", "code", or "db"
                           The first two are optional usages of the previous two options.
                           "code" tells the script to only decompress the code, and
                           "db" to only move the data into the database.
@@ -197,11 +197,11 @@ function extractCode()
         echo "OK"
     fi
 
-    mkdir -pm 02777 "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
+    mkdir -pm 2777 "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
 
     # Also do the log archive if it exists.
     FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '.logs.' | head -n1)
-    if [[ -f "$FILENAME" ]]
+    if [[ -n "$FILENAME" ]]
     then
         echo -n "Extracting log files - "
         case "$FILENAME" in
@@ -228,7 +228,7 @@ function extractCode()
     mkdir -p "${MAGENTOROOT}/var/log/"
     touch "${MAGENTOROOT}/var/log/exception_dev.log"
     touch "${MAGENTOROOT}/var/log/system_dev.log"
-    chmod -R 02777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
+    chmod -R 2777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
 
     echo "OK"
 }
@@ -236,7 +236,7 @@ function extractCode()
 ####################################################################################################
 function createDb
 {
-    mysqladmin --force -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" drop $DBNAME 2>/dev/null
+    mysqladmin --force -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" drop $DBNAME &>/dev/null
 
     mysqladmin -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" create $DBNAME 2>/dev/null
 }
@@ -271,7 +271,7 @@ function doDbReconfigure()
 {
     echo -n "Replacing DB values. - "
 
-    getLocalMerchantXmlValues
+    getMerchantLocalXmlValues
 
     setConfigValue 'admin/dashboard/enable_charts' '0'
 
@@ -334,28 +334,7 @@ function deleteFromConfigWhere()
     runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path $1"
 }
 
-####################################################################################################
-# function updateLocalXml()
-# {
-#     getLocalMerchantXmlValues
-#
-#     updateLocalXmlParam "key" "$CRYPT_KEY"
-#     updateLocalXmlParam "date" "$INSTALL_DATE"
-#     updateLocalXmlParam "table_prefix" "$TABLE_PREFIX"
-#     updateLocalXmlParam "username" "$DBUSER"
-#     updateLocalXmlParam "password" "$DBPASS"
-#     updateLocalXmlParam "dbname" "$DBNAME"
-#     updateLocalXmlParam "host" "$DBHOST"
-#     updateLocalXmlParam "frontName" "admin"
-# }
-#
-# function updateLocalXmlParam()
-# {
-#     sed "s/<${1}><\!\[CDATA\[.*\]\]><\/${1}>/<${1}><\!\[CDATA\[${2}\]\]><\/${1}>/" "${MAGENTOROOT}/app/etc/local.xml" > "${MAGENTOROOT}/app/etc/local.TMP"
-#     mv -f "${MAGENTOROOT}/app/etc/local.TMP" "${MAGENTOROOT}/app/etc/local.xml"
-# }
-
-function getLocalMerchantXmlValues()
+function getMerchantLocalXmlValues()
 {
     #   If empty then get the values.
     if [[ -z "$INSTALL_DATE" ]]
@@ -373,10 +352,19 @@ function getLocalMerchantXmlValues()
 
 getLocalXmlValue()
 {
+    # Assume we're doing a dump restore.
+    APP_ETC_LOCAL_XML="${MAGENTOROOT}/app/etc/local.xml.merchant"
+
+    if [[ ! -f "${APP_ETC_LOCAL_XML}" ]]
+    then
+        # Else, we're doing an install-only.
+        APP_ETC_LOCAL_XML="${MAGENTOROOT}/app/etc/local.xml"
+    fi
+
     # First look for value surrounded by "CDATA" construct.
     LOCAL_XML_SEARCH="s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p"
     debug "local XML search string" "${LOCAL_XML_SEARCH}"
-    PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${MAGENTOROOT}/app/etc/local.xml.merchant" | head -n 1)
+    PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${APP_ETC_LOCAL_XML}" | head -n 1)
     debug "local XML found" "${PARAMVALUE}"
 
     # If not found then try searching without.
@@ -384,7 +372,7 @@ getLocalXmlValue()
     then
         LOCAL_XML_SEARCH="s/.*<${1}>\(.*\)<\/${1}>.*/\1/p"
         debug "local XML search string" "${LOCAL_XML_SEARCH}"
-        PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${MAGENTOROOT}/app/etc/local.xml.merchant" | head -n 1)
+        PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${APP_ETC_LOCAL_XML}" | head -n 1)
         debug "local XML found" "${PARAMVALUE}"
 
         # Prevent disaster.
@@ -417,9 +405,7 @@ function getOrigHtaccess()
         mv "${MAGENTOROOT}/.htaccess" "${MAGENTOROOT}/.htaccess.merchant"
     fi
 
-    if [[ ! -f "${MAGENTOROOT}/.htaccess" ]]
-    then
-        cat <<EOF > "${MAGENTOROOT}/.htaccess"
+    cat <<EOF > "${MAGENTOROOT}/.htaccess"
 ############################################
 ## uncomment these lines for CGI mode
 ## make sure to specify the correct cgi php binary file name
@@ -632,8 +618,6 @@ function getOrigHtaccess()
 
 EOF
 
-    fi
-
 }
 
 
@@ -649,9 +633,7 @@ function getMediaOrigHtaccess()
         mv "${MAGENTOROOT}/media/.htaccess" "${MAGENTOROOT}/media/.htaccess.merchant"
     fi
 
-    if [[ ! -f "${MAGENTOROOT}/media/.htaccess" ]]
-    then
-        cat <<EOF > "${MAGENTOROOT}/media/.htaccess"
+    cat <<EOF > "${MAGENTOROOT}/media/.htaccess"
 Options All -Indexes
 <IfModule mod_php5.c>
 php_flag engine 0
@@ -680,7 +662,6 @@ Options -ExecCGI
 
 EOF
 
-    fi
 }
 
 function getOrigLocalXml()
@@ -690,11 +671,9 @@ function getOrigLocalXml()
         mv "${MAGENTOROOT}/app/etc/local.xml" "${MAGENTOROOT}/app/etc/local.xml.merchant"
     fi
 
-    if [[ ! -f "${MAGENTOROOT}/app/etc/local.xml" ]]
-    then
-        getLocalMerchantXmlValues
+    getMerchantLocalXmlValues
 
-        cat <<EOF > "${MAGENTOROOT}/app/etc/local.xml"
+    cat <<EOF > "${MAGENTOROOT}/app/etc/local.xml"
 <?xml version="1.0"?>
 <!--
 /**
@@ -764,8 +743,6 @@ function getOrigLocalXml()
 
 EOF
 
-    fi
-
 }
 
 function getOrigEnterpriseXml()
@@ -775,9 +752,7 @@ function getOrigEnterpriseXml()
         mv "${MAGENTOROOT}/app/etc/enterprise.xml" "${MAGENTOROOT}/app/etc/enterprise.xml.merchant"
     fi
 
-    if [[ ! -f "${MAGENTOROOT}/app/etc/enterprise.xml" ]]
-    then
-        cat <<EOF > "${MAGENTOROOT}/app/etc/enterprise.xml"
+    cat <<EOF > "${MAGENTOROOT}/app/etc/enterprise.xml"
 <?xml version='1.0' encoding="utf-8" ?>
 <!--
 /**
@@ -826,8 +801,6 @@ function getOrigEnterpriseXml()
 
 EOF
 
-    fi
-
 }
 
 function getOrigIndex()
@@ -837,9 +810,7 @@ function getOrigIndex()
         mv "${MAGENTOROOT}/index.php" "${MAGENTOROOT}/index.php.merchant"
     fi
 
-    if [[ ! -f "${MAGENTOROOT}/index.php" ]]
-    then
-        cat <<EOF > index.php
+    cat <<EOF > index.php
 <?php
 /**
  * Magento Enterprise Edition
@@ -930,8 +901,6 @@ Mage::run(\$mageRunCode, \$mageRunType);
 
 EOF
 
-    fi
-
 }
 
 function doFileReconfigure()
@@ -943,13 +912,12 @@ function doFileReconfigure()
     getOrigLocalXml
     getOrigEnterpriseXml
     getOrigIndex
-#     updateLocalXml
 
     echo "OK"
 }
 
 ####################################################################################################
-function cleanInstall()
+function installOnly()
 {
     if [[ -f "${MAGENTOROOT}/app/etc/local.xml" ]]
     then
@@ -957,11 +925,14 @@ function cleanInstall()
         exit 1;
     fi
 
-    echo -n "Installing - "
+    echo "Installing."
 
     createDb
 
-    chmod -R 02777 "${MAGENTOROOT}/var" "${MAGENTOROOT}/media" "${MAGENTOROOT}/app/etc"
+    mkdir -p "${MAGENTOROOT}/var/log/"
+    touch "${MAGENTOROOT}/var/log/exception.log"
+    touch "${MAGENTOROOT}/var/log/system.log"
+    chmod -R 2777 "${MAGENTOROOT}/var" "${MAGENTOROOT}/media" "${MAGENTOROOT}/app/etc"
 
     php -f install.php -- --license_agreement_accepted yes \
         --locale en_US --timezone `php -r 'echo date_default_timezone_get();'` --default_currency USD \
@@ -972,7 +943,7 @@ function cleanInstall()
         --admin_lastname Owner --admin_firstname Store --admin_email "${ADMIN_EMAIL}" \
         --admin_username admin --admin_password 123123q
 
-    echo "OK"
+    doDbReconfigure
 }
 
 ####################################################################################################
@@ -992,7 +963,7 @@ function gitAddQuiet()
         mv -f .gitignore .gitignore.merchant
     fi
 
-    cat << 'GIT_IGNORE_EOF' > .gitignore
+    cat <<GIT_IGNORE_EOF > .gitignore
 /media/
 /var/
 /.idea/
@@ -1029,7 +1000,7 @@ GIT_IGNORE_EOF
 
 ####################################################################################################
 #   Parse options and set environment.
-OPTIONS=`getopt -o Hfrcm:h:D:u:p:b:e:l: -l help,force,reconfigure,clean-install,mode:,host:,database:,user:,password:,base-url:,email:,locale: -n "$0" -- "$@"`
+OPTIONS=`getopt -o Hfrim:h:D:u:p:b:e:l: -l help,force,reconfigure,install,mode:,host:,database:,user:,password:,base-url:,email:,locale: -n "$0" -- "$@"`
 
 if [[ $? != 0 ]]
 then
@@ -1046,7 +1017,7 @@ while true; do
         -H|--help )             showHelp; exit 0;;
         -f|--force )            FORCE_RESTORE=1; shift 1;;
         -r|--reconfigure )      MODE="reconfigure"; shift 1;;
-        -c|--clean-install )    MODE="clean-install"; shift 1;;
+        -i|--install-only )     MODE="install-only"; shift 1;;
         -m|--mode )             MODE="$2"; shift 2;;
         -h|--host )             OPT_DBHOST="$2"; shift 2;;
         -D|--database )         OPT_DBNAME="$2"; shift 2;;
@@ -1066,7 +1037,7 @@ done
 
 # Catch bad modes before initializing variables.
 case "$MODE" in
-    reconfigure|clean-install|code|db) ;;
+    reconfigure|install-only|code|db) ;;
     '') ;;
     *) echo "Bad mode."; echo; showHelp; exit 1 ;;
 esac
@@ -1080,9 +1051,14 @@ case "$MODE" in
         doDbReconfigure
         ;;
 
-    # --clean-install
-    clean-install)
-        cleanInstall
+    # --install-only
+    install-only)
+        installOnly
+        # Add GIT repo if none exists.
+        if [[ ! -d ".git" ]]
+        then
+            gitAdd
+        fi
         ;;
 
     # --mode code
@@ -1101,12 +1077,10 @@ case "$MODE" in
 
     # Empty "mode". Do everything.
     '')
+        ( createDb ) &
         extractCode
         doFileReconfigure
-        # Spawn process to handle GIT wrapper with immediate return
-        #   to work in background while the DB load runs.
         ( gitAddQuiet ) &
-        createDb
         restoreDb
         doDbReconfigure
         ;;
