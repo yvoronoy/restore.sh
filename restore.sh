@@ -159,7 +159,7 @@ function extractCode()
 
     debug "Code dump Filename" "$FILENAME"
 
-    if [[ ! -f "$FILENAME" ]]
+    if [[ -z "$FILENAME" ]]
     then
         echo "\"$FILENAME\" is not a valid file" >&2
         exit 1
@@ -200,7 +200,7 @@ function extractCode()
     mkdir -pm 2777 "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
 
     # Also do the log archive if it exists.
-    FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '.logs.' | head -n1)
+    FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '\.logs\.' | head -n1)
     if [[ -n "$FILENAME" ]]
     then
         echo -n "Extracting log files - "
@@ -220,7 +220,7 @@ function extractCode()
     echo -n "Updating permissions and cleanup - "
 
     # Remove confusing OS X garbage if any.
-    find . -name '._*' -print0 | xargs -0 rm
+#     find . -name '._*' -print0 | xargs -0 rm
 
     find . -type d -print0 | xargs -0 chmod a+rx
     find . -type f -print0 | xargs -0 chmod 644
@@ -250,7 +250,7 @@ function restoreDb()
 
     debug "DB dump Filename" "$FILENAME"
 
-    if [[ ! -f "$FILENAME" ]]
+    if [[ -z "$FILENAME" ]]
     then
         echo "DB dump absent" >&2
         exit 1
@@ -353,7 +353,7 @@ function getMerchantLocalXmlValues()
 
 getLocalXmlValue()
 {
-    # Assume we're doing a dump restore.
+    # First, assume we're doing a dump restore.
     APP_ETC_LOCAL_XML="${MAGENTOROOT}/app/etc/local.xml.merchant"
 
     if [[ ! -f "${APP_ETC_LOCAL_XML}" ]]
@@ -362,6 +362,7 @@ getLocalXmlValue()
         APP_ETC_LOCAL_XML="${MAGENTOROOT}/app/etc/local.xml"
     fi
 
+    # Next:
     # First look for value surrounded by "CDATA" construct.
     LOCAL_XML_SEARCH="s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p"
     debug "local XML search string" "${LOCAL_XML_SEARCH}"
@@ -951,7 +952,7 @@ function installOnly()
 ####################################################################################################
 function gitAdd()
 {
-    echo -n "Wrapping deployment with local only 'git' repository - "
+    echo -n "Wrapping deployment with local-only 'git' repository - "
 
     gitAddQuiet
 
@@ -978,6 +979,7 @@ function gitAddQuiet()
 *.tbz
 *.zip
 *.tar
+.DS_Store
 
 GIT_IGNORE_EOF
 
@@ -988,8 +990,15 @@ GIT_IGNORE_EOF
 
     git init >/dev/null 2>&1
 
-    find . -type f -regextype posix-extended ! -regex \
-        '\./.git/.*|\./media/.*|\./var/.*|.*\.svn/.*|\./\.idea/.*|.*\.gz|.*\.tgz|.*\.bz|.*\.bz2|.*\.tbz2|.*\.tbz|.*\.zip|.*\.tar' \
+    if [[ `uname` == 'Darwin' ]]
+    then
+        FIND_REGEX_TYPE='find -E . -type f'
+    else
+        FIND_REGEX_TYPE='find . -type f -regextype posix-extended'
+    fi
+
+    $FIND_REGEX_TYPE ! -regex \
+        '\./\.git/.*|\./media/.*|\./var/.*|.*\.svn/.*|\./\.idea/.*|.*\.gz|.*\.tgz|.*\.bz|.*\.bz2|.*\.tbz2|.*\.tbz|.*\.zip|.*\.tar|.*DS_Store' \
         -print0 | xargs -0 git add -f
 
     git commit -m "initial merchant deployment" >/dev/null 2>&1
@@ -1029,7 +1038,7 @@ while true; do
         -e|--email )            OPT_ADMIN_EMAIL="$2"; shift 2;;
         -l|--locale )           OPT_LOCALE_CODE="$2"; shift 2;;
         -- ) shift; break;;
-        * ) echo "Internal getopt parse error!"; echo; showHelp; exit 1;;
+        * ) echo "Internal getopt parse error."; echo; showHelp; exit 1;;
     esac
 done
 
