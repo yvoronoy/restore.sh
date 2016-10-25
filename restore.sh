@@ -23,9 +23,9 @@ INSTALL_DATE=
 
 DEBUG_MODE=0
 
-MAGENTOROOT="${PWD}"
+MAGENTOROOT="$PWD"
 
-CONFIG_FILE_NAME="restore.conf"
+CONFIG_FILE="${HOME}/restore.conf"
 DEPLOYMENT_DIR_NAME=$(basename "$MAGENTOROOT")
 ADMIN_EMAIL=
 LOCALE_CODE="en_US"
@@ -41,6 +41,7 @@ function showHelp()
 Magento Deployment Restore Script
 Usage: ${0} [option]
     -H, --help            Show available params for script (this screen).
+    -c, --config-file     Specify a configuration file other than the default.
     -f, --force           Install without pause to check data.
     -r, --reconfigure     ReConfigure current Magento deployment.
     -i, --install-only    Standard fresh install procedure through CLI.
@@ -60,7 +61,7 @@ Usage: ${0} [option]
 This script assumes it is being run from the new deployment directory with the
 merchant's backup files.
 
-Your "~/${CONFIG_FILE_NAME}" file must be manually created in your home directory.
+Your "${CONFIG_FILE}" file must be manually created in your home directory.
 
 Missing entries are treated as empty strings. In most cases, if the requested
 value is not included on the command line then the corresponding value from the
@@ -68,7 +69,7 @@ config file is used. In the special case of the DB name, if the DB name is
 empty in the config file and none is entered on the command line then the
 current working directory basename is used. Digits are allowed as a DB name.
 
-Sample "~/${CONFIG_FILE_NAME}":
+Sample "${CONFIG_FILE}":
 DBHOST=sparta-db
 DBNAME=rwoodbury_test
 DBUSER=rwoodbury
@@ -84,20 +85,43 @@ ENDHELP
 }
 
 ####################################################################################################
+# Check required system tools
+_check_installed_tools() {
+    local missed=""
+
+    until [ -z "$1" ]; do
+        type -t $1 >/dev/null 2>/dev/null
+        if (( $? != 0 )); then
+            missed="$missed $1"
+        fi
+        shift
+    done
+
+    echo $missed
+}
+
+# Selftest for checking tools which will used
+checkTools() {
+    REQUIRED_UTILS='sed tar mysql head gzip getopt mysqladmin php'
+    MISSED_REQUIRED_TOOLS=`_check_installed_tools $REQUIRED_UTILS`
+    if (( `echo $MISSED_REQUIRED_TOOLS | wc -w` > 0 ));
+    then
+        echo -e "Unable to create backup due to missing required bash tools: $MISSED_REQUIRED_TOOLS"
+        exit 1
+    fi
+}
+
+####################################################################################################
 function initVariables()
 {
-    if [[ -f ~/"$CONFIG_FILE_NAME" ]]
-    then
-        PATH_CONFIG_FILE=~/"$CONFIG_FILE_NAME"
-    else
-        PATH_CONFIG_FILE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/"$CONFIG_FILE_NAME"
-    fi
+    CONFIG_FILE="${OPT_CONFIG_FILE:-$CONFIG_FILE}"
 
     # Read defaults from config file if it exists.
-    if [[ -f "$PATH_CONFIG_FILE" ]]
+    if [[ -f "$CONFIG_FILE" ]]
     then
-        source "$PATH_CONFIG_FILE"
+        source "$CONFIG_FILE"
     fi
+
 
     DBHOST="${OPT_DBHOST:-$DBHOST}"
 
@@ -146,7 +170,7 @@ ENDCHECK
         echo -n "Continue? [Y/n]: "
         read CONFIRM
 
-        case "${CONFIRM}" in
+        case "$CONFIRM" in
             [Nn]|[Nn][Oo]) echo "Interrupted by user, exiting..."; exit ;;
         esac
     fi
@@ -290,15 +314,15 @@ function doDbReconfigure()
     setConfigValue 'dev/log/exception_file' 'exception_dev.log'
     setConfigValue 'dev/log/file' 'system_dev.log'
 
-    setConfigValue 'general/locale/code' "${LOCALE_CODE}"
+    setConfigValue 'general/locale/code' "$LOCALE_CODE"
 
     setConfigValue 'web/cookie/cookie_domain' ''
     setConfigValue 'web/cookie/cookie_path' ''
     setConfigValue 'web/cookie/cookie_lifetime' '0'
 
-    setConfigValue 'web/secure/base_url' "${BASE_URL}"
+    setConfigValue 'web/secure/base_url' "$BASE_URL"
     setConfigValue 'web/secure/use_in_adminhtml' '0'
-    setConfigValue 'web/unsecure/base_url' "${BASE_URL}"
+    setConfigValue 'web/unsecure/base_url' "$BASE_URL"
 
     deleteFromConfigWhere "IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
 
@@ -356,7 +380,7 @@ getLocalXmlValue()
     # First, assume we're doing a dump restore.
     APP_ETC_LOCAL_XML="${MAGENTOROOT}/app/etc/local.xml.merchant"
 
-    if [[ ! -f "${APP_ETC_LOCAL_XML}" ]]
+    if [[ ! -f "$APP_ETC_LOCAL_XML" ]]
     then
         # Else, we're doing an install-only.
         APP_ETC_LOCAL_XML="${MAGENTOROOT}/app/etc/local.xml"
@@ -365,20 +389,20 @@ getLocalXmlValue()
     # Next:
     # First look for value surrounded by "CDATA" construct.
     LOCAL_XML_SEARCH="s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p"
-    debug "local XML search string" "${LOCAL_XML_SEARCH}"
-    PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${APP_ETC_LOCAL_XML}" | head -n 1)
-    debug "local XML found" "${PARAMVALUE}"
+    debug "local XML search string" "$LOCAL_XML_SEARCH"
+    PARAMVALUE=$(sed -n -e "$LOCAL_XML_SEARCH" "$APP_ETC_LOCAL_XML" | head -n 1)
+    debug "local XML found" "$PARAMVALUE"
 
     # If not found then try searching without.
-    if [[ -z "${PARAMVALUE}" ]]
+    if [[ -z "$PARAMVALUE" ]]
     then
         LOCAL_XML_SEARCH="s/.*<${1}>\(.*\)<\/${1}>.*/\1/p"
-        debug "local XML search string" "${LOCAL_XML_SEARCH}"
-        PARAMVALUE=$(sed -n -e "${LOCAL_XML_SEARCH}" "${APP_ETC_LOCAL_XML}" | head -n 1)
-        debug "local XML found" "${PARAMVALUE}"
+        debug "local XML search string" "$LOCAL_XML_SEARCH"
+        PARAMVALUE=$(sed -n -e "$LOCAL_XML_SEARCH" "$APP_ETC_LOCAL_XML" | head -n 1)
+        debug "local XML found" "$PARAMVALUE"
 
         # Prevent disaster.
-        if [[ "${PARAMVALUE}" == '<![CDATA[]]>' ]]
+        if [[ "$PARAMVALUE" == '<![CDATA[]]>' ]]
         then
             PARAMVALUE=''
         fi
@@ -397,7 +421,7 @@ function debug()
         return
     fi
 
-    echo "KEY: ${1}  VALUE: ${2}"
+    echo "KEY: $1  VALUE: $2"
 }
 
 function getOrigHtaccess()
@@ -941,11 +965,11 @@ function installOnly()
 
     php -f install.php -- --license_agreement_accepted yes \
         --locale en_US --timezone `php -r 'echo date_default_timezone_get();'` --default_currency USD \
-        --db_host "${DBHOST}" --db_name "${DBNAME}" --db_user "${DBUSER}" --db_pass "${DBPASS}" \
+        --db_host "$DBHOST" --db_name "$DBNAME" --db_user "$DBUSER" --db_pass "$DBPASS" \
         --url ${BASE_URL} --use_rewrites yes \
-        --use_secure no --secure_base_url "${BASE_URL}" --use_secure_admin no \
+        --use_secure no --secure_base_url "$BASE_URL" --use_secure_admin no \
         --skip_url_validation yes \
-        --admin_lastname Owner --admin_firstname Store --admin_email "${ADMIN_EMAIL}" \
+        --admin_lastname Owner --admin_firstname Store --admin_email "$ADMIN_EMAIL" \
         --admin_username admin --admin_password 123123q
 }
 
@@ -1009,9 +1033,11 @@ GIT_IGNORE_EOF
 ##  MAIN  ##########################################################################################
 ####################################################################################################
 
+checkTools
+
 ####################################################################################################
 #   Parse options and set environment.
-OPTIONS=`getopt -o Hfrim:h:D:u:p:b:e:l: -l help,force,reconfigure,install,mode:,host:,database:,user:,password:,base-url:,email:,locale: -n "$0" -- "$@"`
+OPTIONS=`getopt -o Hc:frim:h:D:u:p:b:e:l: -l help,config-file:,force,reconfigure,install,mode:,host:,database:,user:,password:,base-url:,email:,locale: -n "$0" -- "$@"`
 
 if [[ $? != 0 ]]
 then
@@ -1026,6 +1052,7 @@ eval set -- "$OPTIONS"
 while true; do
     case "$1" in
         -H|--help )             showHelp; exit 0;;
+        -c|--config-file )      OPT_CONFIG_FILE="$2"; shift 2;;
         -f|--force )            FORCE_RESTORE=1; shift 1;;
         -r|--reconfigure )      MODE="reconfigure"; shift 1;;
         -i|--install-only )     MODE="install-only"; shift 1;;
