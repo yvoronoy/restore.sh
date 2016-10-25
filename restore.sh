@@ -31,6 +31,8 @@ ADMIN_EMAIL=
 LOCALE_CODE="en_US"
 FORCE_RESTORE=0
 
+MAMP_PHP="/Applications/MAMP/bin/php/php5.6.25/bin/php"
+
 
 ####################################################################################################
 #Define functions.
@@ -951,7 +953,7 @@ function installOnly()
         exit 1;
     fi
 
-    echo "Installing."
+    echo "Performing Magento install."
 
     createDb
 
@@ -963,10 +965,17 @@ function installOnly()
 
     chmod 2777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/media"
 
-    php -f install.php -- --license_agreement_accepted yes \
+    if [[ -f "$MAMP_PHP" ]]
+    then
+        THIS_PHP="$MAMP_PHP"
+    else
+        THIS_PHP="php"
+    fi
+
+    "$THIS_PHP" -f install.php -- --license_agreement_accepted yes \
         --locale en_US --timezone `php -r 'echo date_default_timezone_get();'` --default_currency USD \
-        --db_host "$DBHOST" --db_name "$DBNAME" --db_user "$DBUSER" --db_pass "$DBPASS" \
-        --url ${BASE_URL} --use_rewrites yes \
+        --db_host $DBHOST --db_name "$DBNAME" --db_user "$DBUSER" --db_pass "$DBPASS" \
+        --url "$BASE_URL" --use_rewrites yes \
         --use_secure no --secure_base_url "$BASE_URL" --use_secure_admin no \
         --skip_url_validation yes \
         --admin_lastname Owner --admin_firstname Store --admin_email "$ADMIN_EMAIL" \
