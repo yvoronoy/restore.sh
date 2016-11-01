@@ -318,6 +318,8 @@ function doDbReconfigure()
 
     setConfigValue 'general/locale/code' "$LOCALE_CODE"
 
+    setConfigValue 'system/csrf/use_form_key' '0'
+
     setConfigValue 'web/cookie/cookie_domain' ''
     setConfigValue 'web/cookie/cookie_path' ''
     setConfigValue 'web/cookie/cookie_lifetime' '0'
@@ -353,7 +355,7 @@ function doDbReconfigure()
 ##  Pass parameters as key / value.
 function setConfigValue()
 {
-    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '$2' WHERE path = '$1'"
+    runMysqlQuery "REPLACE INTO ${TABLE_PREFIX}core_config_data SET path = '$1', value = '$2'"
 }
 
 function deleteFromConfigWhere()
@@ -980,6 +982,14 @@ function installOnly()
         --skip_url_validation yes \
         --admin_lastname Owner --admin_firstname Store --admin_email "$ADMIN_EMAIL" \
         --admin_username admin --admin_password 123123q
+
+    doDbReconfigure
+
+    # Add GIT repo if none exists.
+    if [[ ! -d ".git" ]]
+    then
+        gitAdd
+    fi
 }
 
 ####################################################################################################
@@ -1101,12 +1111,6 @@ case "$MODE" in
     # --install-only
     install-only)
         installOnly
-        doDbReconfigure
-        # Add GIT repo if none exists.
-        if [[ ! -d ".git" ]]
-        then
-            gitAdd
-        fi
         ;;
 
     # --mode code
