@@ -300,9 +300,14 @@ function doDbReconfigure()
 
     getMerchantLocalXmlValues
 
+    setConfigValue 'admin/captcha/enable' '0'
+
     setConfigValue 'admin/dashboard/enable_charts' '0'
 
+    setConfigValue 'admin/enterprise_logging/actions' 'a:0:{}'
+
     setConfigValue 'admin/security/lockout_failures' '0'
+    setConfigValue 'admin/security/lockout_threshold' '0'
     setConfigValue 'admin/security/password_is_forced' '0'
     setConfigValue 'admin/security/password_lifetime' '9999'
     setConfigValue 'admin/security/session_cookie_lifetime' '0'
@@ -319,6 +324,8 @@ function doDbReconfigure()
     setConfigValue 'general/locale/code' "$LOCALE_CODE"
 
     setConfigValue 'system/csrf/use_form_key' '0'
+    setConfigValue 'system/page_cache/multicurrency' '0'
+    setConfigValue 'system/page_crawl/multicurrency' '0'
 
     setConfigValue 'web/cookie/cookie_domain' ''
     setConfigValue 'web/cookie/cookie_path' ''
