@@ -974,8 +974,11 @@ function installOnly()
         THIS_PHP="php"
     fi
 
+    # MAMP 4.0.5 returns the wrong timezone.
+    TIMEZONE=`php -r 'echo date_default_timezone_get();'`
+
     "$THIS_PHP" -f install.php -- --license_agreement_accepted yes \
-        --locale en_US --timezone `php -r 'echo date_default_timezone_get();'` --default_currency USD \
+        --locale en_US --timezone "$TIMEZONE" --default_currency USD \
         --db_host $DBHOST --db_name "$DBNAME" --db_user "$DBUSER" --db_pass "$DBPASS" \
         --url "$BASE_URL" --use_rewrites yes \
         --use_secure no --secure_base_url "$BASE_URL" --use_secure_admin no \
