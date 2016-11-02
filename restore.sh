@@ -2,8 +2,8 @@
 # Magento restore script
 #
 # You can use config file
-# Create file in home directory .restore.conf
-# Or in directory where restore.sh placed
+# Create file in home directory restore.conf
+# Or specify path to restore.conf
 
 export LC_CTYPE=C
 export LANG=C
@@ -31,7 +31,7 @@ ADMIN_EMAIL=
 LOCALE_CODE="en_US"
 FORCE_RESTORE=0
 
-MAMP_PHP="/Applications/MAMP/bin/php/php5.6.25/bin/php"
+ALT_PHP=
 
 
 ####################################################################################################
@@ -77,6 +77,7 @@ DBNAME=rwoodbury_test
 DBUSER=rwoodbury
 DBPASS=
 BASE_URL=http://web1.sparta.corp.magento.com/dev/rwoodbury/
+ALT_PHP=/Applications/MAMP/bin/php/php5.6.25/bin/php
 
 NOTE: OS X users will need to install a newer version of "getopt" from a
 repository like MacPorts:
@@ -969,23 +970,20 @@ function installOnly()
     chmod 2777 "${MAGENTOROOT}/var"
     mkdir -p "${MAGENTOROOT}/var/log/"
     chmod 2777 "${MAGENTOROOT}/var/log"
-    touch "${MAGENTOROOT}/var/log/exception.log"
-    touch "${MAGENTOROOT}/var/log/system.log"
+    touch "${MAGENTOROOT}/var/log/exception_dev.log"
+    touch "${MAGENTOROOT}/var/log/system_dev.log"
 
     chmod 2777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/media"
 
-    if [[ -f "$MAMP_PHP" ]]
+    if [[ -n "$ALT_PHP" && -f "$ALT_PHP" ]]
     then
-        THIS_PHP="$MAMP_PHP"
+        THIS_PHP="$ALT_PHP"
     else
         THIS_PHP="php"
     fi
 
-    # MAMP 4.0.5 returns the wrong timezone.
-    TIMEZONE=`php -r 'echo date_default_timezone_get();'`
-
-    "$THIS_PHP" -f install.php -- --license_agreement_accepted yes \
-        --locale en_US --timezone "$TIMEZONE" --default_currency USD \
+    "$THIS_PHP" -f install.php -- --license_agreement_accepted yes --locale $LOCALE_CODE \
+        --timezone `"$THIS_PHP" -r 'echo date_default_timezone_get();'` --default_currency USD \
         --db_host $DBHOST --db_name "$DBNAME" --db_user "$DBUSER" --db_pass "$DBPASS" \
         --url "$BASE_URL" --use_rewrites yes \
         --use_secure no --secure_base_url "$BASE_URL" --use_secure_admin no \
