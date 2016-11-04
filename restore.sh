@@ -360,15 +360,27 @@ function doDbReconfigure()
     echo "OK"
 }
 
-##  Pass parameters as key / value.
+##  Pass parameters as: key value
 function setConfigValue()
 {
-    runMysqlQuery "REPLACE INTO ${TABLE_PREFIX}core_config_data SET path = '$1', value = '$2'"
+    # "REPLACE" doesn't replace all the values we want to replace
+    runMysqlQuery "SELECT value FROM ${TABLE_PREFIX}core_config_data WHERE path = '$1' LIMIT 1"
+    if [[ -z "$SQLQUERY_RESULT" ]]
+    then
+        runMysqlQuery "INSERT INTO ${TABLE_PREFIX}core_config_data SET path = '$1', value = '$2'"
+    else
+        runMysqlQuery "UPDATE ${TABLE_PREFIX}core_config_data SET value = '$2' WHERE path = '$1'"
+    fi
 }
 
 function deleteFromConfigWhere()
 {
     runMysqlQuery "DELETE FROM ${TABLE_PREFIX}core_config_data WHERE path $1"
+}
+
+function runMysqlQuery()
+{
+    SQLQUERY_RESULT=$(mysql -h$DBHOST -u"$DBUSER" -p"$DBPASS" -D "$DBNAME" -e "$1" 2>/dev/null);
 }
 
 function getMerchantLocalXmlValues()
@@ -419,11 +431,6 @@ getLocalXmlValue()
             PARAMVALUE=''
         fi
     fi
-}
-
-function runMysqlQuery()
-{
-    SQLQUERY_RESULT=$(mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" -D $DBNAME -e "$1" 2>/dev/null);
 }
 
 function debug()
