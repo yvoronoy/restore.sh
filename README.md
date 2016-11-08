@@ -16,8 +16,8 @@ restore.sh [option]
 -h|--help - show available params for script
 -w|--without-config - force do not use config
 -f|--force - force install without wizzard
--c|--reconfigure - ReConfigure current magento instance
--r|--clean-install - Standard install procedure through CLI
+-r|--reconfigure - ReConfigure current magento instance
+-i|--clean-install - Standard install procedure through CLI
 ```
 
 ### Configuration file
