@@ -58,8 +58,8 @@ function initScriptOptions()
         echo "-h|--help - show available params for script"
         echo "-w|--without-config - force do not use config"
         echo "-f|--force - force install without wizzard"
-        echo "-c|--reconfigure - ReConfigure current magento instance"
-        echo "-r|--clean-install - Standard install procedure through CLI"
+        echo "-r|--reconfigure - ReConfigure current magento instance"
+        echo "-i|--clean-install - Standard install procedure through CLI"
         exit;;
     -w|--without-config )
         FORCE_WITHOUT_CONFIG=1;
@@ -179,7 +179,7 @@ function getCodeDumpFilename()
     FILENAME_CODE_DUMP=$(ls -1 *.tbz2 *.tar.bz2 2> /dev/null | head -n1)
     if [ "${FILENAME_CODE_DUMP}" == "" ]
     then
-        FILENAME_CODE_DUMP=$(ls -1 *.tar.gz | grep -v 'logs.tar.gz' | head -n1)
+        FILENAME_CODE_DUMP=$(ls -1 *.tar.gz | ls -1 *.tgz | grep -v 'logs.tar.gz' | head -n1)
     fi
     DEBUG_KEY="Code dump Filename"
     DEBUG_VAL=$FILENAME_CODE_DUMP
@@ -251,6 +251,7 @@ function extract()
          case $EXTRACT_FILENAME in
              *.tar.bz2)   tar xjf $EXTRACT_FILENAME;;
              *.tar.gz)    gunzip -c $EXTRACT_FILENAME | gunzip -cf | tar -x ;;
+             *.tgz)       gunzip -c $EXTRACT_FILENAME | gunzip -cf | tar -x ;;
              *.gz)        gunzip $EXTRACT_FILENAME;;
              *.tbz2)      tar xjf $EXTRACT_FILENAME;;
              *)           echo "'$EXTRACT_FILENAME' cannot be extracted";;
@@ -915,4 +916,3 @@ function main()
 }
 
 main
-
