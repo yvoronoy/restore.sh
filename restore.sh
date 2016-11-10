@@ -176,14 +176,15 @@ function _prepareDbName()
 
 function getCodeDumpFilename()
 {
-    FILENAME_CODE_DUMP=$(ls -1 *.tbz2 *.tar.bz2 2> /dev/null | head -n1)
+    FILENAME_CODE_DUMP=$(find . -maxdepth 1 -name '*.tbz2' -o -name '*.tar.bz2' | head -n1)
     if [ "${FILENAME_CODE_DUMP}" == "" ]
     then
-        FILENAME_CODE_DUMP=$(ls -1 *.tar.gz | ls -1 *.tgz | grep -v 'logs.tar.gz' | head -n1)
+        FILENAME_CODE_DUMP=$(find . -maxdepth 1 -name '*.tar.gz' | grep -v 'logs.tar.gz' | head -n1)
     fi
-    DEBUG_KEY="Code dump Filename"
-    DEBUG_VAL=$FILENAME_CODE_DUMP
-    debug
+    if [ ! "$FILENAME_CODE_DUMP" ]
+    then
+        FILENAME_CODE_DUMP=$(find . -maxdepth 1 -name '*.tgz' | head -n1)
+    fi
 }
 
 function getDbDumpFilename()
