@@ -10,11 +10,13 @@ export LANG=C
 
 ####################################################################################################
 #Define variables
-DBHOST="localhost"
+DBHOST='sparta-db'
 DBNAME=
-DBUSER=
+DBUSER="$USER"
 DBPASS=
-BASE_URL=
+P_DBPASS=
+DEV_DB_PREFIX="${USER}_"
+BASE_URL="http://web1.sparta.corp.magento.com/dev/${USER}/"
 # DEV_TABLE_PREFIX=
 
 TABLE_PREFIX=
@@ -23,12 +25,13 @@ INSTALL_DATE=
 
 DEBUG_MODE=0
 
-MAGENTOROOT="$PWD"
+MAGENTO_ROOT="$PWD"
 
-CONFIG_FILE="${HOME}/restore.conf"
-DEPLOYMENT_DIR_NAME=$(basename "$MAGENTOROOT")
-ADMIN_EMAIL=
-LOCALE_CODE="en_US"
+CONFIG_FILE_NAME='restore.conf'
+CONFIG_FILE="${HOME}/${CONFIG_FILE_NAME}"
+DEPLOY_DIR_NAME=$(basename "$MAGENTO_ROOT")
+ADMIN_EMAIL="${USER}@magento.com"
+LOCALE_CODE='en_US'
 FORCE_RESTORE=0
 
 ALT_PHP=
@@ -60,24 +63,36 @@ Usage: ${0} [option]
     -e, --email           Admin email address.
     -l, --locale          "base/locale/code" configuration value. Defaults to "en_US".
 
-This script assumes it is being run from the new deployment directory with the
-merchant's backup files.
+This script can be located anywhere but it assumes it is being run from within
+the new deployment directory with the merchant's backup files. Your
+"${CONFIG_FILE_NAME}" file must be manually created in your home directory.
 
-Your "${CONFIG_FILE}" file must be manually created in your home directory.
-
-Missing entries are treated as empty strings. In most cases, if the requested
+Missing entries are given default values. In most cases, if the requested
 value is not included on the command line then the corresponding value from the
 config file is used. In the special case of the DB name, if the DB name is
 empty in the config file and none is entered on the command line then the
-current working directory basename is used. Digits are allowed as a DB name.
+current working directory basename is used with the value inDEV_DB_PREFIX.
+Digits are allowed as a DB name. Sparta users might not need a configuration file.
 
-Sample "${CONFIG_FILE}":
-DBHOST=sparta-db
-DBNAME=rwoodbury_test
-DBUSER=rwoodbury
+Available config names with their default values are:
+ADMIN_EMAIL="${USER}@magento.com"
+ALT_PHP=
+BASE_URL="http://web1.sparta.corp.magento.com/dev/${USER}/"
+DBHOST='sparta-db'
+DBNAME=
 DBPASS=
-BASE_URL=http://web1.sparta.corp.magento.com/dev/rwoodbury/
-ALT_PHP=/Applications/MAMP/bin/php/php5.6.25/bin/php
+DBUSER="$USER"
+DEBUG_MODE=0
+DEV_DB_PREFIX="${USER}_"
+LOCALE_CODE='en_US'
+
+Sample "${CONFIG_FILE_NAME}" on a local OSX workstation with MAMP:
+DBHOST=localhost
+DBUSER=magento
+DBPASS=magpass
+DEV_DB_PREFIX=
+BASE_URL=http://localhost/
+ALT_PHP=/Applications/MAMP/bin/php/php5.6.27/bin/php
 
 NOTE: OS X users will need to install a newer version of "getopt" from a
 repository like MacPorts:
@@ -88,28 +103,22 @@ ENDHELP
 }
 
 ####################################################################################################
-# Check required system tools
-_check_installed_tools() {
-    local missed=""
-
-    until [ -z "$1" ]; do
-        type -t $1 >/dev/null 2>/dev/null
-        if (( $? != 0 )); then
-            missed="$missed $1"
-        fi
-        shift
-    done
-
-    echo $missed
-}
-
 # Selftest for checking tools which will used
 checkTools() {
-    REQUIRED_UTILS='sed tar mysql head gzip getopt mysqladmin php'
-    MISSED_REQUIRED_TOOLS=`_check_installed_tools $REQUIRED_UTILS`
-    if (( `echo $MISSED_REQUIRED_TOOLS | wc -w` > 0 ));
+    local MISSED_REQUIRED_TOOLS=''
+
+    for TOOL in 'sed' 'tar' 'mysql' 'head' 'gzip' 'getopt' 'mysqladmin' 'php'
+    do
+        which $TOOL >/dev/null 2>/dev/null
+        if [[ $? != 0 ]]
+        then
+            MISSED_REQUIRED_TOOLS="$MISSED_REQUIRED_TOOLS $TOOL"
+        fi
+    done
+
+    if [[ -n $MISSED_REQUIRED_TOOLS ]]
     then
-        echo -e "Unable to create backup due to missing required bash tools: $MISSED_REQUIRED_TOOLS"
+        echo "Unable to restore instance due to missing required tools: $MISSED_REQUIRED_TOOLS"
         exit 1
     fi
 }
@@ -119,7 +128,7 @@ function initVariables()
 {
     CONFIG_FILE="${OPT_CONFIG_FILE:-$CONFIG_FILE}"
 
-    # Read defaults from config file if it exists.
+    # Read defaults from config file. They will overwrite corresponding variables.
     if [[ -f "$CONFIG_FILE" ]]
     then
         source "$CONFIG_FILE"
@@ -130,7 +139,7 @@ function initVariables()
 
     if [[ -z $DBNAME ]]
     then
-        DBNAME="$DEPLOYMENT_DIR_NAME"
+        DBNAME="$DEV_DB_PREFIX$DEPLOY_DIR_NAME"
     fi
 
     # The variable DBNAME is often not quoted throughout the script as it should always appear as one word.
@@ -139,9 +148,9 @@ function initVariables()
     DBUSER="${OPT_DBUSER:-$DBUSER}"
     DBPASS="${OPT_DBPASS:-$DBPASS}"
 
-#   if [[ $DBNAME != "$DEPLOYMENT_DIR_NAME" ]]
+#   if [[ $DBNAME != "$DEPLOY_DIR_NAME" ]]
 #   then
-#       DEV_TABLE_PREFIX="${DEPLOYMENT_DIR_NAME}_"
+#       DEV_TABLE_PREFIX="${DEPLOY_DIR_NAME}_"
 #   fi
 #   echo -n "Enter developer table prefix [[${DEV_TABLE_PREFIX}]]: "
 #   read TMP_DEV_TABLE_PREFIX
@@ -151,7 +160,7 @@ function initVariables()
 #   fi
 
     BASE_URL="${OPT_BASE_URL:-$BASE_URL}"
-    BASE_URL="${BASE_URL}${DEPLOYMENT_DIR_NAME}/"
+    BASE_URL="${BASE_URL}${DEPLOY_DIR_NAME}/"
 
     ADMIN_EMAIL="${OPT_ADMIN_EMAIL:-$ADMIN_EMAIL}"
 
@@ -177,6 +186,11 @@ ENDCHECK
             [Nn]|[Nn][Oo]) echo "Interrupted by user, exiting..."; exit ;;
         esac
     fi
+
+    if [[ -n $DBPASS ]]
+    then
+        P_DBPASS="-p\"$DBPASS\""
+    fi
 }
 
 ####################################################################################################
@@ -194,13 +208,20 @@ function extractCode()
 
     echo -n "Extracting code"
 
+    if [[ -n `man tar | grep delay-directory-restore` ]]
+    then
+        DDR_OPT='--delay-directory-restore'
+    else
+        DDR_OPT=''
+    fi
+
     if which pv > /dev/null; then
         echo ":"
         case "$FILENAME" in
             *.tar.gz|*.tgz)
-                pv -B 16k "$FILENAME" | tar zxf - 2>/dev/null ;;
+                pv -B 16k "$FILENAME" | tar zxf - $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
             *.tar.bz2|*.tbz2|*.tbz)
-                pv -B 16k "$FILENAME" | tar jxf - 2>/dev/null ;;
+                pv -B 16k "$FILENAME" | tar jxf - $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
             *.gz)
                 gunzip -k "$FILENAME" ;;
             *.bz|*.bz2)
@@ -213,7 +234,7 @@ function extractCode()
         # Modern versions of tar can automatically choose the decompression type when needed.
         case "$FILENAME" in
             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
-                tar xf "$FILENAME" ;;
+                tar xf "$FILENAME" $DDR_OPT -C "$MAGENTO_ROOT" ;;
             *.gz)
                 gunzip -k "$FILENAME" ;;
             *.bz|*.bz2)
@@ -224,7 +245,7 @@ function extractCode()
         echo "OK"
     fi
 
-    mkdir -pm 2777 "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
+    mkdir -pm 2777 "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
 
     # Also do the log archive if it exists.
     FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '\.logs\.' | head -n1)
@@ -233,13 +254,13 @@ function extractCode()
         echo -n "Extracting log files - "
         case "$FILENAME" in
             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
-                tar xf "$FILENAME" 2>/dev/null ;;
+                tar xf "$FILENAME" $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
             *.gz)
                 gunzip -k "$FILENAME" ;;
             *.bz|*.bz2)
                 bunzip2 -k "$FILENAME" ;;
             *)
-                echo "\"$FILENAME\" could not be extracted" >&2; exit 1 ;;
+                echo; echo "\"$FILENAME\" could not be extracted" >&2 ;;
         esac
         echo "OK"
     fi
@@ -249,14 +270,14 @@ function extractCode()
     # Remove confusing OS X garbage if any.
 #     find . -name '._*' -print0 | xargs -0 rm
 
-    find . -type d -print0 | xargs -0 chmod a+rx
-    find . -type f -print0 | xargs -0 chmod 644
+#     find . -type d -print0 | xargs -0 chmod a+rx
+#     find . -type f -print0 | xargs -0 chmod 644
 
-    mkdir -p "${MAGENTOROOT}/var/log/"
-    touch "${MAGENTOROOT}/var/log/exception_dev.log"
-    touch "${MAGENTOROOT}/var/log/system_dev.log"
-    chmod -R 2777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
-    chmod -R 2777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/var" "${MAGENTOROOT}/media"
+    mkdir -p "${MAGENTO_ROOT}/var/log/"
+    touch "${MAGENTO_ROOT}/var/log/exception_dev.log"
+    touch "${MAGENTO_ROOT}/var/log/system_dev.log"
+    chmod -R 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
+    chmod -R 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
 
     echo "OK"
 }
@@ -264,9 +285,9 @@ function extractCode()
 ####################################################################################################
 function createDb
 {
-    mysqladmin --force -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" drop $DBNAME &>/dev/null
+    mysqladmin --force -h"$DBHOST" -u"$DBUSER" $P_DBPASS drop $DBNAME &>/dev/null
 
-    mysqladmin -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" create $DBNAME 2>/dev/null
+    mysqladmin -h"$DBHOST" -u"$DBUSER" $P_DBPASS create $DBNAME 2>/dev/null
 }
 
 function restoreDb()
@@ -286,10 +307,10 @@ function restoreDb()
     if which pv > /dev/null
     then
         echo ":"
-        pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force $DBNAME 2>/dev/null
+        pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" $P_DBPASS --force $DBNAME 2>/dev/null
     else
         echo -n " - "
-        gunzip -c "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" -p"$DBPASS" --force $DBNAME 2>/dev/null
+        gunzip -c "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" $P_DBPASS --force $DBNAME 2>/dev/null
         echo "OK"
     fi
 }
@@ -297,10 +318,14 @@ function restoreDb()
 ####################################################################################################
 function doDbReconfigure()
 {
-    echo -n "Replacing DB values. - "
+    echo -n "Replacing DB core config values. - "
 
     getMerchantLocalXmlValues
 
+    # Copy core_config_data table. MySQL >= 5.5 gives a warning if destination table exists and does not copy data.
+    runMysqlQuery "CREATE TABLE IF NOT EXISTS ${TABLE_PREFIX}core_config_data_merchant AS SELECT * FROM ${TABLE_PREFIX}core_config_data"
+
+    # Set convenient values for testing.
     setConfigValue 'admin/captcha/enable' '0'
 
     setConfigValue 'admin/dashboard/enable_charts' '0'
@@ -363,7 +388,6 @@ function doDbReconfigure()
 ##  Pass parameters as: key value
 function setConfigValue()
 {
-    # "REPLACE" doesn't replace all the values we want to replace
     runMysqlQuery "SELECT value FROM ${TABLE_PREFIX}core_config_data WHERE path = '$1' LIMIT 1"
     if [[ -z "$SQLQUERY_RESULT" ]]
     then
@@ -380,7 +404,7 @@ function deleteFromConfigWhere()
 
 function runMysqlQuery()
 {
-    SQLQUERY_RESULT=$(mysql -h$DBHOST -u"$DBUSER" -p"$DBPASS" -D "$DBNAME" -e "$1" 2>/dev/null);
+    SQLQUERY_RESULT=$(mysql -h$DBHOST -u"$DBUSER" $P_DBPASS -D "$DBNAME" -e "$1" 2>/dev/null);
 }
 
 function getMerchantLocalXmlValues()
@@ -402,12 +426,12 @@ function getMerchantLocalXmlValues()
 getLocalXmlValue()
 {
     # First, assume we're doing a dump restore.
-    APP_ETC_LOCAL_XML="${MAGENTOROOT}/app/etc/local.xml.merchant"
+    APP_ETC_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml.merchant"
 
     if [[ ! -f "$APP_ETC_LOCAL_XML" ]]
     then
         # Else, we're doing an install-only.
-        APP_ETC_LOCAL_XML="${MAGENTOROOT}/app/etc/local.xml"
+        APP_ETC_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml"
     fi
 
     # Next:
@@ -426,7 +450,7 @@ getLocalXmlValue()
         debug "local XML found" "$PARAMVALUE"
 
         # Prevent disaster.
-        if [[ "$PARAMVALUE" == '<![CDATA[]]>' ]]
+        if [[ "$PARAMVALUE" = '<![CDATA[]]>' ]]
         then
             PARAMVALUE=''
         fi
@@ -445,12 +469,12 @@ function debug()
 
 function getOrigHtaccess()
 {
-    if [[ ! -f "${MAGENTOROOT}/.htaccess.merchant" && -f "${MAGENTOROOT}/.htaccess" ]]
+    if [[ ! -f "${MAGENTO_ROOT}/.htaccess.merchant" && -f "${MAGENTO_ROOT}/.htaccess" ]]
     then
-        mv "${MAGENTOROOT}/.htaccess" "${MAGENTOROOT}/.htaccess.merchant"
+        mv "${MAGENTO_ROOT}/.htaccess" "${MAGENTO_ROOT}/.htaccess.merchant"
     fi
 
-    cat <<EOF > "${MAGENTOROOT}/.htaccess"
+    cat <<EOF > "${MAGENTO_ROOT}/.htaccess"
 ############################################
 ## uncomment these lines for CGI mode
 ## make sure to specify the correct cgi php binary file name
@@ -668,17 +692,17 @@ EOF
 
 function getMediaOrigHtaccess()
 {
-    if [[ ! -f "${MAGENTOROOT}/get.php" ]]
+    if [[ ! -f "${MAGENTO_ROOT}/get.php" ]]
     then
         return;
     fi
 
-    if [[ ! -f "${MAGENTOROOT}/media/.htaccess.merchant" && -f "${MAGENTOROOT}/media/.htaccess" ]]
+    if [[ ! -f "${MAGENTO_ROOT}/media/.htaccess.merchant" && -f "${MAGENTO_ROOT}/media/.htaccess" ]]
     then
-        mv "${MAGENTOROOT}/media/.htaccess" "${MAGENTOROOT}/media/.htaccess.merchant"
+        mv "${MAGENTO_ROOT}/media/.htaccess" "${MAGENTO_ROOT}/media/.htaccess.merchant"
     fi
 
-    cat <<EOF > "${MAGENTOROOT}/media/.htaccess"
+    cat <<EOF > "${MAGENTO_ROOT}/media/.htaccess"
 Options All -Indexes
 <IfModule mod_php5.c>
 php_flag engine 0
@@ -711,14 +735,14 @@ EOF
 
 function getOrigLocalXml()
 {
-    if [[ ! -f "${MAGENTOROOT}/app/etc/local.xml.merchant" && -f "${MAGENTOROOT}/app/etc/local.xml" ]]
+    if [[ ! -f "${MAGENTO_ROOT}/app/etc/local.xml.merchant" && -f "${MAGENTO_ROOT}/app/etc/local.xml" ]]
     then
-        mv "${MAGENTOROOT}/app/etc/local.xml" "${MAGENTOROOT}/app/etc/local.xml.merchant"
+        mv "${MAGENTO_ROOT}/app/etc/local.xml" "${MAGENTO_ROOT}/app/etc/local.xml.merchant"
     fi
 
     getMerchantLocalXmlValues
 
-    cat <<EOF > "${MAGENTOROOT}/app/etc/local.xml"
+    cat <<EOF > "${MAGENTO_ROOT}/app/etc/local.xml"
 <?xml version="1.0"?>
 <!--
 /**
@@ -792,12 +816,12 @@ EOF
 
 function getOrigEnterpriseXml()
 {
-    if [[ ! -f "${MAGENTOROOT}/app/etc/enterprise.xml.merchant" && -f "${MAGENTOROOT}/app/etc/enterprise.xml" ]]
+    if [[ ! -f "${MAGENTO_ROOT}/app/etc/enterprise.xml.merchant" && -f "${MAGENTO_ROOT}/app/etc/enterprise.xml" ]]
     then
-        mv "${MAGENTOROOT}/app/etc/enterprise.xml" "${MAGENTOROOT}/app/etc/enterprise.xml.merchant"
+        mv "${MAGENTO_ROOT}/app/etc/enterprise.xml" "${MAGENTO_ROOT}/app/etc/enterprise.xml.merchant"
     fi
 
-    cat <<EOF > "${MAGENTOROOT}/app/etc/enterprise.xml"
+    cat <<EOF > "${MAGENTO_ROOT}/app/etc/enterprise.xml"
 <?xml version='1.0' encoding="utf-8" ?>
 <!--
 /**
@@ -850,9 +874,9 @@ EOF
 
 function getOrigIndex()
 {
-    if [[ ! -f "${MAGENTOROOT}/index.php.merchant" && -f "${MAGENTOROOT}/index.php" ]]
+    if [[ ! -f "${MAGENTO_ROOT}/index.php.merchant" && -f "${MAGENTO_ROOT}/index.php" ]]
     then
-        mv "${MAGENTOROOT}/index.php" "${MAGENTOROOT}/index.php.merchant"
+        mv "${MAGENTO_ROOT}/index.php" "${MAGENTO_ROOT}/index.php.merchant"
     fi
 
     cat <<EOF > index.php
@@ -964,7 +988,7 @@ function doFileReconfigure()
 ####################################################################################################
 function installOnly()
 {
-    if [[ -f "${MAGENTOROOT}/app/etc/local.xml" ]]
+    if [[ -f "${MAGENTO_ROOT}/app/etc/local.xml" ]]
     then
         echo "Magento already installed, remove app/etc/local.xml file to reinstall" >&2
         exit 1;
@@ -974,13 +998,13 @@ function installOnly()
 
     createDb
 
-    chmod 2777 "${MAGENTOROOT}/var"
-    mkdir -p "${MAGENTOROOT}/var/log/"
-    chmod 2777 "${MAGENTOROOT}/var/log"
-    touch "${MAGENTOROOT}/var/log/exception_dev.log"
-    touch "${MAGENTOROOT}/var/log/system_dev.log"
+    chmod 2777 "${MAGENTO_ROOT}/var"
+    mkdir -p "${MAGENTO_ROOT}/var/log/"
+    chmod 2777 "${MAGENTO_ROOT}/var/log"
+    touch "${MAGENTO_ROOT}/var/log/exception_dev.log"
+    touch "${MAGENTO_ROOT}/var/log/system_dev.log"
 
-    chmod 2777 "${MAGENTOROOT}/app/etc" "${MAGENTOROOT}/media"
+    chmod 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/media"
 
     if [[ -n "$ALT_PHP" && -f "$ALT_PHP" ]]
     then
@@ -1048,7 +1072,7 @@ GIT_IGNORE_EOF
 
     git init >/dev/null 2>&1
 
-    if [[ `uname` == 'Darwin' ]]
+    if [[ `uname` = 'Darwin' ]]
     then
         FIND_REGEX_TYPE='find -E . -type f'
     else
@@ -1144,9 +1168,11 @@ case "$MODE" in
 
     # Empty "mode". Do everything.
     '')
+        # create DB in background
         ( createDb ) &
         extractCode
         doFileReconfigure
+        # create repository in background
         ( gitAddQuiet ) &
         restoreDb
         doDbReconfigure

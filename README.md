@@ -2,13 +2,13 @@
 - Fixed SQL queries so that they accept table names of only digits.
 - Fixed dissagreement between help statement and actual option usage.
 - Changed handling of configuration file so that values from the config file are always used but are overridden by values from the command line. All configuration values can be overwritten by their matching command line option. Where appropriate, options are similar to using "mysql" client.
-- Added modes to only process code or only import data. They are commented out as they are incomplete.
+- Added modes to only process code or only import data.
 - The added and commented out code is a start at adding/changing the existing table name prefix. Table prefix handling is incomplete.
-- Added options for setting administrator's email and site language.
+- Added options for setting administrator's email and site language with default values from the user.
 - Added automatic restoring of logs archive if it exists.
 - A number of automated features, such as caching, are turned off to aid in debugging.
 
-These changes have been tested with Ubuntu 14.04 Server and Debian 8.
+These changes have been tested with Ubuntu 14.04 Server, Debian 8, OS X 10.11, and on 'aws-sparta-web1'.
 
 # Magento Support Restore Script
 ```
@@ -42,37 +42,49 @@ Usage: ./restore.sh [option]
     -l, --locale          "base/locale/code" configuration value. Defaults to "en_US".
 ```
 
-This script assumes it is being run from the new deployment directory with the
-merchant's backup files.
+This script can be located anywhere but it assumes it is being run from within the new deployment directory with the merchant's backup files. Your "restore.conf" file must be manually created in your home directory.
 
-Your "~/.restore.conf" file must be manually created in your home directory.
+Missing entries are given default values. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used with the value inDEV_DB_PREFIX. Digits are allowed as a DB name. Sparta users might not need a configuration file.
 
-Missing entries are treated as empty strings. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used. Digits are allowed as a DB name.
+Available config names with their default values are:
+```
+ADMIN_EMAIL="${USER}@magento.com"
+ALT_PHP=
+BASE_URL="http://web1.sparta.corp.magento.com/dev/${USER}/"
+DBHOST='sparta-db'
+DBNAME=
+DBPASS=
+DBUSER="$USER"
+DEBUG_MODE=0
+DEV_DB_PREFIX="${USER}_"
+LOCALE_CODE='en_US'
+```
 
 ## Example
-This is the contents of my "~/.restore.conf" that is running on a VirtualBox instance of Debian 8:
+This is the contents of my "~/restore.conf" that is running on my OS X workstation:
 ```
 DBHOST=localhost
 DBUSER=magento
 DBPASS=magpass
-BASE_URL=http://192.168.56.106/
-ADMIN_EMAIL=rwoodbury@magento.com
+DEV_DB_PREFIX=
+BASE_URL=http://localhost/
+ALT_PHP=/Applications/MAMP/bin/php/php5.6.27/bin/php
 ```
 
-Say you're working on SUPEE-9999. Place your dump files and this script in a directory inside your working web root, say "/var/www/9999/". You should see something like this (and type "n" or "no" to cancel the process):
+Say you're working on SUPEE-9999 and your web root is "/Users/rwoodbury/deploys/". Place your dump files in a directory inside your working web root, say "/Users/rwoodbury/deploys/9999/". You should see something like this (and type "n" or "no" to cancel the process):
 ```
-reid@d8p56m56a:/var/www/9999$ ./restore.sh
+ip-10-236-8-17:9999 rwoodbury$ ./restore.sh
 Check parameters:
 DB host is: localhost
 DB name is: 9999
 DB user is: magento
 DB pass is: magpass
-Full base url is: http://192.168.56.106/9999/
+Full base url is: http://localhost/9999/
 Admin email is: rwoodbury@magento.com
 Locale code is: en_US
 Continue? [Y/n]: n
 Interrupted by user, exiting...
-reid@u14p55m56a:/var/www/9999$
+ip-10-236-8-17:9999 rwoodbury$
 ```
 
 # Progress bar
