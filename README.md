@@ -1,4 +1,4 @@
-# Additions and Updates to Restore Script
+# Additions and Updates to M1 Restore Script
 - Fixed SQL queries so that they accept table names of only digits.
 - Fixed dissagreement between help statement and actual option usage.
 - Changed handling of configuration file so that values from the config file are always used but are overridden by values from the command line. All configuration values can be overwritten by their matching command line option. Where appropriate, options are similar to using "mysql" client.
@@ -10,7 +10,7 @@
 
 These changes have been tested with Ubuntu 14.04 Server, Debian 8, OS X 10.11, and on 'aws-sparta-web1'.
 
-# Magento Support Restore Script
+# Magento 1 Support Restore Script
 ```
 > restore.sh
 ```
