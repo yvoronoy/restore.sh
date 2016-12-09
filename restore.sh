@@ -45,46 +45,74 @@ function showHelp()
     cat <<ENDHELP
 Magento Deployment Restore Script
 Usage: ${0} [option]
-    -H, --help            Show available params for script (this screen).
-    -c, --config-file     Specify a configuration file other than the default.
-    -f, --force           Install without pause to check data.
-    -r, --reconfigure     ReConfigure current Magento deployment.
-    -i, --install-only    Standard fresh install procedure through CLI.
-    -m, --mode            This must have one of the following:
-                          "reconfigure", "install-only", "code", or "db"
-                          The first two are optional usages of the previous two options.
-                          "code" tells the script to only decompress the code, and
-                          "db" to only move the data into the database.
-    -h, --host            DB host IP address, defaults to "localhost".
-    -D, --database        Database or schema name, defaults to current directory name.
-    -u, --user            DB user name.
-    -p, --password        DB password
-    -b, --base-url        Base URL for this deployment host.
-    -e, --email           Admin email address.
-    -l, --locale          "base/locale/code" configuration value. Defaults to "en_US".
+    -H --help
+            Show available params for script (this screen).
 
-This script can be located anywhere but it assumes it is being run from within
-the new deployment directory with the merchant's backup files. Your
+    -c --config-file <file-name>
+            Specify a configuration file.
+            Defaults to "${CONFIG_FILE}".
+
+    -f --force
+            Install without pause to check data.
+
+    -r --reconfigure
+            ReConfigure both files and DB in this deployment.
+
+    -i --install-only
+            Standard fresh install procedure through CLI.
+
+    -m --mode <run-mode>
+            This must have one of the following:
+            "reconfigure", "install-only", "code", or "db"
+            The first two are optional usages of the previous two options.
+            "code" tells the script to only decompress the code, and
+            "db" to only move the data into the database.
+
+    -h --host <host-name>|<ip-address>
+            DB host IP address, defaults to "sparta-db".
+
+    -D --database <name-string>
+            Database or schema name.
+            Defaults to "${USER}_" plus the current directory name.
+
+    -u --user <user-name>
+            DB user name. Defaults to "$USER".
+
+    -p --password <password>
+            DB password. Default is empty.
+
+    -b --base-url <url>
+            Base URL for this deployment host.
+            Defaults to "http://web1.sparta.corp.magento.com/dev/${USER}/".
+
+    -e --email <email-address>
+            Admin email address. Defaults to "${USER}@magento.com".
+
+    -l --locale <locale-code>
+            "base/locale/code" configuration value. Defaults to "${LOCALE_CODE}".
+
+This script can be located anywhere but it assumes the current working directory
+is the new deployment directory with the merchant's backup files. Your default
 "${CONFIG_FILE_NAME}" file must be manually created in your home directory.
 
 Missing entries are given default values. In most cases, if the requested
 value is not included on the command line then the corresponding value from the
 config file is used. In the special case of the DB name, if the DB name is
 empty in the config file and none is entered on the command line then the
-current working directory basename is used with the value inDEV_DB_PREFIX.
+current working directory basename is used with the value in DEV_DB_PREFIX.
 Digits are allowed as a DB name. Sparta users might not need a configuration file.
 
 Available config names with their default values are:
-ADMIN_EMAIL="${USER}@magento.com"
+ADMIN_EMAIL=${ADMIN_EMAIL}
 ALT_PHP=
-BASE_URL="http://web1.sparta.corp.magento.com/dev/${USER}/"
-DBHOST='sparta-db'
+BASE_URL=${BASE_URL}
+DBHOST=${DBHOST}
 DBNAME=
 DBPASS=
-DBUSER="$USER"
+DBUSER=${DBUSER}
 DEBUG_MODE=0
-DEV_DB_PREFIX="${USER}_"
-LOCALE_CODE='en_US'
+DEV_DB_PREFIX=${DEV_DB_PREFIX}
+LOCALE_CODE=${LOCALE_CODE}
 
 Sample "${CONFIG_FILE_NAME}" on a local OSX workstation with MAMP:
 DBHOST=localhost
