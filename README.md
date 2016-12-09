@@ -23,28 +23,50 @@ It restores dump files created by Magento Support module or backup.sh script:
 
 ## Options
 ```
-Usage: ./restore.sh [option]
-    -H, --help            Show available params for script (this screen).
-    -f, --force           Install without pause to check data.
-    -r, --reconfigure     ReConfigure current Magento deployment.
-    -i, --install-only    Standard fresh install procedure through CLI.
-    -m, --mode            This must have one of the following:
-                          "reconfigure", "install-only", "code", or "db"
-                          The first two are optional usages of the previous two options.
-                          "code" tells the script to only decompress the code, and
-                          "db" to only move the data into the database.
-    -h, --host            DB host IP address, defaults to "localhost".
-    -D, --database        Database or schema name, defaults to current directory name.
-    -u, --user            DB user name.
-    -p, --password        DB password
-    -b, --base-url        Base URL for this deployment host.
-    -e, --email           Admin email address.
-    -l, --locale          "base/locale/code" configuration value. Defaults to "en_US".
+-c --config-file <file-name>
+        Specify a configuration file.
+
+-f --force
+        Install without pause to check data.
+
+-r --reconfigure
+        ReConfigure both files and DB in this deployment.
+
+-i --install-only
+        Standard fresh install procedure through CLI.
+
+-m --mode <run-mode>
+        This must have one of the following:
+        "reconfigure", "install-only", "code", or "db"
+        The first two are optional usages of the previous two options.
+        "code" tells the script to only decompress the code, and
+        "db" to only move the data into the database.
+
+-h --host <host-name>|<ip-address>
+        DB host IP address, defaults to "sparta-db".
+
+-D --database <name-string>
+        Database or schema name.
+
+-u --user <user-name>
+        DB user name.
+
+-p --password <password>
+        DB password.
+
+-b --base-url <url>
+        Base URL for this deployment host.
+
+-e --email <email-address>
+        Admin email address.
+
+-l --locale <locale-code>
+        "base/locale/code" configuration value.
 ```
 
-This script can be located anywhere but it assumes it is being run from within the new deployment directory with the merchant's backup files. Your "restore.conf" file must be manually created in your home directory.
+This script can be located anywhere but it assumes the current working directory is the new deployment directory with the merchant's backup files. Your default "restore.conf" file must be manually created in your home directory.
 
-Missing entries are given default values. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used with the value inDEV_DB_PREFIX. Digits are allowed as a DB name. Sparta users might not need a configuration file.
+Missing entries are given default values. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used with the value in DEV_DB_PREFIX. Digits are allowed as a DB name. Sparta users might not need a configuration file.
 
 Available config names with their default values are:
 ```
