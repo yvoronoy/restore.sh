@@ -5,6 +5,8 @@
 # Create file in home directory restore.conf
 # Or specify path to restore.conf
 
+trap "exit 1" INT SIGHUP SIGINT SIGTERM
+
 export LC_CTYPE=C
 export LANG=C
 
@@ -19,11 +21,14 @@ DEV_DB_PREFIX="${USER}_"
 BASE_URL="http://web1.sparta.corp.magento.com/dev/${USER}/"
 # DEV_TABLE_PREFIX=
 
+ALT_PHP=
+
 TABLE_PREFIX=
 CRYPT_KEY=
 INSTALL_DATE=
 
 DEBUG_MODE=0
+DDR_OPT=
 
 MAGENTO_ROOT="$PWD"
 
@@ -33,8 +38,6 @@ DEPLOY_DIR_NAME=$(basename "$MAGENTO_ROOT")
 ADMIN_EMAIL="${USER}@magento.com"
 LOCALE_CODE='en_US'
 FORCE_RESTORE=0
-
-ALT_PHP=
 
 
 ####################################################################################################
@@ -207,17 +210,17 @@ ENDCHECK
 
     if [[ ${FORCE_RESTORE} -eq 0 ]]
     then
-        echo -n "Continue? [Y/n]: "
+        echo -n 'Continue? [Y/n]: '
         read CONFIRM
 
         case "$CONFIRM" in
-            [Nn]|[Nn][Oo]) echo "Interrupted by user, exiting..."; exit ;;
+            [Nn]|[Nn][Oo]) echo 'Interrupted by user, exiting...'; exit ;;
         esac
     fi
 
     if [[ -n $DBPASS ]]
     then
-        P_DBPASS="-p\"$DBPASS\""
+        P_DBPASS='-p'$DBPASS
     fi
 }
 
@@ -226,7 +229,7 @@ function extractCode()
 {
     FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2> /dev/null | grep -v '\.logs\.' | grep -v '\.sql\.' | head -n1)
 
-    debug "Code dump Filename" "$FILENAME"
+    debug 'Code dump Filename' "$FILENAME"
 
     if [[ -z "$FILENAME" ]]
     then
@@ -234,44 +237,13 @@ function extractCode()
         exit 1
     fi
 
-    echo -n "Extracting code"
-
     if [[ -n `man tar | grep delay-directory-restore` ]]
     then
         DDR_OPT='--delay-directory-restore'
-    else
-        DDR_OPT=''
     fi
 
-    if which pv > /dev/null; then
-        echo ":"
-        case "$FILENAME" in
-            *.tar.gz|*.tgz)
-                pv -B 16k "$FILENAME" | tar zxf - $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
-            *.tar.bz2|*.tbz2|*.tbz)
-                pv -B 16k "$FILENAME" | tar jxf - $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
-            *.gz)
-                gunzip -k "$FILENAME" ;;
-            *.bz|*.bz2)
-                bunzip2 -k "$FILENAME" ;;
-            *)
-                echo "\"$FILENAME\" could not be extracted" >&2; exit 1 ;;
-        esac
-    else
-        echo -n " - "
-        # Modern versions of tar can automatically choose the decompression type when needed.
-        case "$FILENAME" in
-            *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
-                tar xf "$FILENAME" $DDR_OPT -C "$MAGENTO_ROOT" ;;
-            *.gz)
-                gunzip -k "$FILENAME" ;;
-            *.bz|*.bz2)
-                bunzip2 -k "$FILENAME" ;;
-            *)
-                echo "\"$FILENAME\" could not be extracted" >&2; exit 1 ;;
-        esac
-        echo "OK"
-    fi
+    echo -n 'Extracting code'
+    expandFileArchive "$FILENAME"
 
     mkdir -pm 2777 "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
 
@@ -279,21 +251,11 @@ function extractCode()
     FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '\.logs\.' | head -n1)
     if [[ -n "$FILENAME" ]]
     then
-        echo -n "Extracting log files - "
-        case "$FILENAME" in
-            *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
-                tar xf "$FILENAME" $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
-            *.gz)
-                gunzip -k "$FILENAME" ;;
-            *.bz|*.bz2)
-                bunzip2 -k "$FILENAME" ;;
-            *)
-                echo; echo "\"$FILENAME\" could not be extracted" >&2 ;;
-        esac
-        echo "OK"
+        echo -n 'Extracting log files'
+        expandFileArchive "$FILENAME"
     fi
 
-    echo -n "Updating permissions and cleanup - "
+    echo -n 'Updating permissions and cleanup - '
 
     # Remove confusing OS X garbage if any.
 #     find . -name '._*' -print0 | xargs -0 rm
@@ -307,7 +269,40 @@ function extractCode()
     chmod -R 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
     chmod -R 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
 
-    echo "OK"
+    echo 'OK'
+}
+
+function expandFileArchive
+{
+    if which pv > /dev/null; then
+        echo ':'
+        case "$1" in
+            *.tar.gz|*.tgz)
+                pv -B 8k "$1" | tar zxf - $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
+            *.tar.bz2|*.tbz2|*.tbz)
+                pv -B 8k "$1" | tar jxf - $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
+            *.gz)
+                gunzip -k "$1" ;;
+            *.bz|*.bz2)
+                bunzip2 -k "$1" ;;
+            *)
+                echo "\"$1\" could not be extracted" >&2; exit 1 ;;
+        esac
+    else
+        echo -n ' - '
+        # Modern versions of tar can automatically choose the decompression type when needed.
+        case "$1" in
+            *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
+                tar xf "$1" $DDR_OPT -C "$MAGENTO_ROOT" ;;
+            *.gz)
+                gunzip -k "$1" ;;
+            *.bz|*.bz2)
+                bunzip2 -k "$1" ;;
+            *)
+                echo "\"$1\" could not be extracted" >&2; exit 1 ;;
+        esac
+        echo 'OK'
+    fi
 }
 
 ####################################################################################################
@@ -324,11 +319,11 @@ function restoreDb()
 
     FILENAME=$(ls -1 *.sql.* | head -n1)
 
-    debug "DB dump Filename" "$FILENAME"
+    debug 'DB dump Filename' "$FILENAME"
 
     if [[ -z "$FILENAME" ]]
     then
-        echo "DB dump absent" >&2
+        echo 'DB dump absent' >&2
         exit 1
     fi
 
