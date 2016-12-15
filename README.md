@@ -1,4 +1,4 @@
-# Magento Support Restore Script 
+# Magento Support Restore Tool
 ~/bin/restore.sh
 
 This script is designed to be run from folder with Magento dumps.
