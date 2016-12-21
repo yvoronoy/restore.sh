@@ -82,7 +82,7 @@ Usage: ${0} [option]
             DB user name. Defaults to "$USER".
 
     -p --password <password>
-            DB password. Default is empty.
+            DB password. Default is empty. A password cannot contain spaces.
 
     -b --base-url <url>
             Base URL for this deployment host.
@@ -128,6 +128,9 @@ ALT_PHP=/Applications/MAMP/bin/php/php5.6.27/bin/php
 NOTE: OS X users will need to install a newer version of "getopt" from a
 repository like MacPorts:
 > sudo port install getopt
+
+Also note that OS X MAMP users will need to be sure "/Applications/MAMP/Library/bin"
+is in the command path.
 
 ENDHELP
 
