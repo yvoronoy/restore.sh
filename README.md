@@ -8,7 +8,11 @@
 - Added automatic restoring of logs archive if it exists.
 - A number of automated features, such as caching, are turned off to aid in debugging.
 
-These changes have been tested with Ubuntu 14.04 Server, Debian 8, OS X 10.11, and on 'aws-sparta-web1'.
+These changes have been tested with Ubuntu 14.04 Server, Debian 8, OS X 10.11 and 10.12, and on 'aws-sparta-web1'.
+
+Some systems might display the message
+> mdoc warning: Empty input line #
+Those messages can be ignored.
 
 # Magento 1 Support Restore Script
 ```

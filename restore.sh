@@ -223,7 +223,7 @@ ENDCHECK
 
     if [[ -n $DBPASS ]]
     then
-        P_DBPASS='-p'$DBPASS
+        P_DBPASS="-p$DBPASS"
     fi
 }
 
@@ -430,7 +430,7 @@ function deleteFromConfigWhere()
 
 function runMysqlQuery()
 {
-    SQLQUERY_RESULT=$(mysql -h$DBHOST -u"$DBUSER" $P_DBPASS -D "$DBNAME" -e "$1" 2>/dev/null);
+    SQLQUERY_RESULT=$(mysql -h$DBHOST -u"$DBUSER" $P_DBPASS -D $DBNAME -e "$1" 2>/dev/null);
 }
 
 function getMerchantLocalXmlValues()
@@ -905,7 +905,7 @@ function getOrigIndex()
         mv "${MAGENTO_ROOT}/index.php" "${MAGENTO_ROOT}/index.php.merchant"
     fi
 
-    cat <<EOF > index.php
+    cat <<INDEX_EOF > index.php
 <?php
 /**
  * Magento Enterprise Edition
@@ -928,7 +928,7 @@ function getOrigIndex()
  *
  * @category    Mage
  * @package     Mage
- * @copyright Copyright (c) 2006-2015 X.commerce, Inc. (http://www.magento.com)
+ * @copyright Copyright (c) 2006-2016 X.commerce, Inc. and affiliates (http://www.magento.com)
  * @license http://www.magento.com/license/enterprise-edition
  */
 
@@ -974,13 +974,14 @@ if (file_exists(\$maintenanceFile)) {
     exit;
 }
 
-require_once \$mageFilename;
+require MAGENTO_ROOT . '/app/bootstrap.php';
+require_once $mageFilename;
 
-#Varien_Profiler::enable();
+// Varien_Profiler::enable();
 
-if (isset(\$_SERVER['MAGE_IS_DEVELOPER_MODE'])) {
+// if (isset(\$_SERVER['MAGE_IS_DEVELOPER_MODE'])) {
     Mage::setIsDeveloperMode(true);
-}
+// }
 
 ini_set('display_errors', 1);
 
@@ -994,7 +995,7 @@ umask(0);
 
 Mage::run(\$mageRunCode, \$mageRunType);
 
-EOF
+INDEX_EOF
 
 }
 
@@ -1041,7 +1042,7 @@ function installOnly()
 
     "$THIS_PHP" -f install.php -- --license_agreement_accepted yes --locale $LOCALE_CODE \
         --timezone `"$THIS_PHP" -r 'echo date_default_timezone_get();'` --default_currency USD \
-        --db_host $DBHOST --db_name "$DBNAME" --db_user "$DBUSER" --db_pass "$DBPASS" \
+        --db_host $DBHOST --db_name $DBNAME --db_user "$DBUSER" --db_pass "$DBPASS" \
         --url "$BASE_URL" --use_rewrites yes \
         --use_secure no --secure_base_url "$BASE_URL" --use_secure_admin no \
         --skip_url_validation yes \
