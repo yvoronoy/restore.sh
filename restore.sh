@@ -59,7 +59,7 @@ Usage: ${0} [option]
             Install without pause to check data.
 
     -r --reconfigure
-            ReConfigure both files and DB in this deployment.
+            ReConfigure only files and DB.
 
     -i --install-only
             Standard fresh install procedure through CLI.
@@ -974,7 +974,10 @@ if (file_exists(\$maintenanceFile)) {
     exit;
 }
 
-require MAGENTO_ROOT . '/app/bootstrap.php';
+if (file_exists(MAGENTO_ROOT . '/app/bootstrap.php')) {
+	include MAGENTO_ROOT . '/app/bootstrap.php';
+}
+
 require_once \$mageFilename;
 
 // Varien_Profiler::enable();
