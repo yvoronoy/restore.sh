@@ -946,6 +946,7 @@ Whoops, it looks like you have an invalid PHP version.</h3></div><p>Magento supp
  * Error reporting
  */
 error_reporting(E_ALL | E_STRICT);
+ini_set('display_errors', 1);
 
 /**
  * Compilation includes configuration file
@@ -975,7 +976,7 @@ if (file_exists(\$maintenanceFile)) {
 }
 
 if (file_exists(MAGENTO_ROOT . '/app/bootstrap.php')) {
-	include MAGENTO_ROOT . '/app/bootstrap.php';
+    include MAGENTO_ROOT . '/app/bootstrap.php';
 }
 
 require_once \$mageFilename;
@@ -985,8 +986,6 @@ require_once \$mageFilename;
 // if (isset(\$_SERVER['MAGE_IS_DEVELOPER_MODE'])) {
     Mage::setIsDeveloperMode(true);
 // }
-
-ini_set('display_errors', 1);
 
 umask(0);
 
