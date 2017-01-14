@@ -72,7 +72,7 @@ Usage: ${0} [option]
             "db" to only move the data into the database.
 
     -h --host <host-name>|<ip-address>
-            DB host IP address, defaults to "sparta-db".
+            DB host name or IP address, defaults to "sparta-db".
 
     -D --database <name-string>
             Database or schema name.
@@ -87,6 +87,9 @@ Usage: ${0} [option]
     -b --base-url <url>
             Base URL for this deployment host.
             Defaults to "http://web1.sparta.corp.magento.com/dev/${USER}/".
+            If this value is set here it is used precisely as given. If it's
+            not set then the default or config file value will be used and
+            appended with the working directory basename.
 
     -e --email <email-address>
             Admin email address. Defaults to "${USER}@magento.com".
@@ -194,7 +197,11 @@ function initVariables()
 #   fi
 
     BASE_URL="${OPT_BASE_URL:-$BASE_URL}"
-    BASE_URL="${BASE_URL}${DEPLOY_DIR_NAME}/"
+
+    if [[ -z "$OPT_BASE_URL" ]]
+    then
+        BASE_URL="${BASE_URL}${DEPLOY_DIR_NAME}/"
+    fi
 
     ADMIN_EMAIL="${OPT_ADMIN_EMAIL:-$ADMIN_EMAIL}"
 
