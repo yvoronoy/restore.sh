@@ -30,13 +30,21 @@ INSTALL_DATE=
 DEBUG_MODE=0
 DDR_OPT=
 
+TAR_EXCLUDES="--exclude='._*' --exclude='var/cache' --exclude='var/full_page_cache'"
+
 MAGENTO_ROOT="$PWD"
 
-CONFIG_FILE_NAME='restore.conf'
+CONFIG_FILE_NAME='.restore.conf'
 CONFIG_FILE="${HOME}/${CONFIG_FILE_NAME}"
 DEPLOY_DIR_NAME=$(basename "$MAGENTO_ROOT")
 ADMIN_EMAIL="${USER}@magento.com"
 LOCALE_CODE='en_US'
+EXCEPTION_LOG_NAME='exception_dev.log'
+SYSTEM_LOG_NAME='system_dev.log'
+
+# Source of original values when doing a restore from dumps.
+ORIGINAL_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml.merchant"
+
 FORCE_RESTORE=0
 
 
@@ -126,7 +134,7 @@ DBUSER=magento
 DBPASS=magpass
 DEV_DB_PREFIX=
 BASE_URL=http://localhost/
-ALT_PHP=/Applications/MAMP/bin/php/php5.6.27/bin/php
+ALT_PHP=/Applications/MAMP/bin/php/php5.6.28/bin/php
 
 NOTE: OS X users will need to install a newer version of "getopt" from a
 repository like MacPorts:
@@ -232,6 +240,11 @@ ENDCHECK
     then
         P_DBPASS="-p$DBPASS"
     fi
+
+    if [[ -n `man tar | grep delay-directory-restore` ]]
+    then
+        DDR_OPT='--delay-directory-restore'
+    fi
 }
 
 ####################################################################################################
@@ -245,11 +258,6 @@ function extractCode()
     then
         echo "\"$FILENAME\" is not a valid file" >&2
         exit 1
-    fi
-
-    if [[ -n `man tar | grep delay-directory-restore` ]]
-    then
-        DDR_OPT='--delay-directory-restore'
     fi
 
     echo -n 'Extracting code'
@@ -267,15 +275,9 @@ function extractCode()
 
     echo -n 'Updating permissions and cleanup - '
 
-    # Remove confusing OS X garbage if any.
-#     find . -name '._*' -print0 | xargs -0 rm
-
-#     find . -type d -print0 | xargs -0 chmod a+rx
-#     find . -type f -print0 | xargs -0 chmod 644
-
     mkdir -p "${MAGENTO_ROOT}/var/log/"
-    touch "${MAGENTO_ROOT}/var/log/exception_dev.log"
-    touch "${MAGENTO_ROOT}/var/log/system_dev.log"
+    touch "${MAGENTO_ROOT}/var/log/${EXCEPTION_LOG_NAME}"
+    touch "${MAGENTO_ROOT}/var/log/${SYSTEM_LOG_NAME}"
     chmod -R 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
     chmod -R 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
 
@@ -284,13 +286,16 @@ function extractCode()
 
 function expandFileArchive
 {
+    # Tar can exclude confusing OS X garbage if any as if this command was run:
+    # find . -name '._*' -print0 | xargs -0 rm
+
     if which pv > /dev/null; then
         echo ':'
         case "$1" in
             *.tar.gz|*.tgz)
-                pv -B 8k "$1" | tar zxf - $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
+                pv -B 8k "$1" | tar zxf - $TAR_EXCLUDES $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
             *.tar.bz2|*.tbz2|*.tbz)
-                pv -B 8k "$1" | tar jxf - $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
+                pv -B 8k "$1" | tar jxf - $TAR_EXCLUDES $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
             *.gz)
                 gunzip -k "$1" ;;
             *.bz|*.bz2)
@@ -303,7 +308,7 @@ function expandFileArchive
         # Modern versions of tar can automatically choose the decompression type when needed.
         case "$1" in
             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
-                tar xf "$1" $DDR_OPT -C "$MAGENTO_ROOT" ;;
+                tar xf "$1" $TAR_EXCLUDES $DDR_OPT -C "$MAGENTO_ROOT" ;;
             *.gz)
                 gunzip -k "$1" ;;
             *.bz|*.bz2)
@@ -377,8 +382,8 @@ function doDbReconfigure()
     setConfigValue 'dev/css/merge_css_files' '0'
     setConfigValue 'dev/js/merge_files' '0'
     setConfigValue 'dev/log/active' '1'
-    setConfigValue 'dev/log/exception_file' 'exception_dev.log'
-    setConfigValue 'dev/log/file' 'system_dev.log'
+    setConfigValue 'dev/log/exception_file' "$EXCEPTION_LOG_NAME"
+    setConfigValue 'dev/log/file' "$SYSTEM_LOG_NAME"
 
     setConfigValue 'general/locale/code' "$LOCALE_CODE"
 
@@ -458,20 +463,10 @@ function getMerchantLocalXmlValues()
 
 getLocalXmlValue()
 {
-    # First, assume we're doing a dump restore.
-    APP_ETC_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml.merchant"
-
-    if [[ ! -f "$APP_ETC_LOCAL_XML" ]]
-    then
-        # Else, we're doing an install-only.
-        APP_ETC_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml"
-    fi
-
-    # Next:
     # First look for value surrounded by "CDATA" construct.
     LOCAL_XML_SEARCH="s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p"
     debug "local XML search string" "$LOCAL_XML_SEARCH"
-    PARAMVALUE=$(sed -n -e "$LOCAL_XML_SEARCH" "$APP_ETC_LOCAL_XML" | head -n 1)
+    PARAMVALUE=$(sed -n -e "$LOCAL_XML_SEARCH" "$ORIGINAL_LOCAL_XML" | head -n 1)
     debug "local XML found" "$PARAMVALUE"
 
     # If not found then try searching without.
@@ -479,7 +474,7 @@ getLocalXmlValue()
     then
         LOCAL_XML_SEARCH="s/.*<${1}>\(.*\)<\/${1}>.*/\1/p"
         debug "local XML search string" "$LOCAL_XML_SEARCH"
-        PARAMVALUE=$(sed -n -e "$LOCAL_XML_SEARCH" "$APP_ETC_LOCAL_XML" | head -n 1)
+        PARAMVALUE=$(sed -n -e "$LOCAL_XML_SEARCH" "$ORIGINAL_LOCAL_XML" | head -n 1)
         debug "local XML found" "$PARAMVALUE"
 
         # Prevent disaster.
@@ -1026,19 +1021,17 @@ function installOnly()
 {
     if [[ -f "${MAGENTO_ROOT}/app/etc/local.xml" ]]
     then
-        echo "Magento already installed, remove app/etc/local.xml file to reinstall" >&2
+        echo "Magento already installed, rm app/etc/local.xml file to reinstall" >&2
         exit 1;
     fi
 
     echo "Performing Magento install."
 
-    createDb
-
-    chmod 2777 "${MAGENTO_ROOT}/var"
     mkdir -p "${MAGENTO_ROOT}/var/log/"
+    chmod 2777 "${MAGENTO_ROOT}/var"
     chmod 2777 "${MAGENTO_ROOT}/var/log"
-    touch "${MAGENTO_ROOT}/var/log/exception_dev.log"
-    touch "${MAGENTO_ROOT}/var/log/system_dev.log"
+    touch "${MAGENTO_ROOT}/var/log/${EXCEPTION_LOG_NAME}"
+    touch "${MAGENTO_ROOT}/var/log/${SYSTEM_LOG_NAME}"
 
     chmod 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/media"
 
@@ -1057,14 +1050,6 @@ function installOnly()
         --skip_url_validation yes \
         --admin_lastname Owner --admin_firstname Store --admin_email "$ADMIN_EMAIL" \
         --admin_username admin --admin_password 123123q
-
-    doDbReconfigure
-
-    # Add GIT repo if none exists.
-    if [[ ! -d ".git" ]]
-    then
-        gitAdd
-    fi
 }
 
 ####################################################################################################
@@ -1079,7 +1064,7 @@ function gitAdd()
 
 function gitAddQuiet()
 {
-    if [[ -f ".gitignore" ]]
+    if [[ -e ".gitignore" ]]
     then
         mv -f .gitignore .gitignore.merchant
     fi
@@ -1101,8 +1086,9 @@ function gitAddQuiet()
 
 GIT_IGNORE_EOF
 
-    if [[ -d ".git" ]]
+    if [[ -e ".git" ]]
     then
+    	rm -rf .git.merchant
         mv -f .git .git.merchant
     fi
 
@@ -1185,14 +1171,27 @@ case "$MODE" in
 
     # --install-only
     install-only)
+    	# In this case there is no merchant version of the file.
+        ORIGINAL_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml"
+        createDb
         installOnly
+		doDbReconfigure
+		# Add GIT repo if none exists.
+		if [[ ! -d ".git" ]]
+		then
+			gitAdd
+		fi
         ;;
 
     # --mode code
     code)
         extractCode
         doFileReconfigure
-        gitAdd
+        # Add GIT repo if this is not a redo.
+		if [[ ! -d ".git.merchant" ]]
+		then
+			gitAdd
+		fi
         ;;
 
     # --mode db
@@ -1209,7 +1208,13 @@ case "$MODE" in
         extractCode
         doFileReconfigure
         # create repository in background
-        ( gitAddQuiet ) &
+        (
+			# Add GIT repo if this is not a redo.
+			if [[ ! -d ".git.merchant" ]]
+			then
+				gitAddQuiet
+			fi
+		) &
         restoreDb
         doDbReconfigure
         ;;

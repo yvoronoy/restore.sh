@@ -70,7 +70,7 @@ It restores dump files created by Magento Support module or backup.sh script:
 
 This script can be located anywhere but it assumes the current working directory is the new deployment directory with the merchant's backup files. Your default "restore.conf" file must be manually created in your home directory.
 
-Missing entries are given default values. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used with the value in DEV_DB_PREFIX. Digits are allowed as a DB name. Sparta users might not need a configuration file.
+Missing entries are given default values. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used with the value in DEV_DB_PREFIX. Digits are allowed as a DB name. Sparta users might not even need a configuration file.
 
 Available config names with their default values are:
 ```
@@ -87,14 +87,14 @@ LOCALE_CODE='en_US'
 ```
 
 ## Example
-This is the contents of my "~/restore.conf" that is running on my OS X workstation:
+This is the contents of my "~/.restore.conf" that is running on my OS X workstation:
 ```
 DBHOST=localhost
 DBUSER=magento
 DBPASS=magpass
 DEV_DB_PREFIX=
 BASE_URL=http://localhost/
-ALT_PHP=/Applications/MAMP/bin/php/php5.6.27/bin/php
+ALT_PHP=/Applications/MAMP/bin/php/php5.6.28/bin/php
 ```
 
 Say you're working on SUPEE-9999 and your web root is "/Users/rwoodbury/deploys/". Place your dump files in a directory inside your working web root, say "/Users/rwoodbury/deploys/9999/". You should see something like this (and type "n" or "no" to cancel the process):
