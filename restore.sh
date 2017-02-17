@@ -232,7 +232,7 @@ ENDCHECK
         read CONFIRM
 
         case "$CONFIRM" in
-            [Nn]|[Nn][Oo]) echo 'Interrupted by user, exiting...'; exit ;;
+            [Nn]|[Nn][Oo]) echo 'Canceled.'; exit ;;
         esac
     fi
 
@@ -260,7 +260,7 @@ function extractCode()
         exit 1
     fi
 
-    echo -n 'Extracting code'
+    echo 'Extracting code.'
     expandFileArchive "$FILENAME"
 
     mkdir -pm 2777 "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
@@ -269,19 +269,17 @@ function extractCode()
     FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '\.logs\.' | head -n1)
     if [[ -n "$FILENAME" ]]
     then
-        echo -n 'Extracting log files'
+        echo 'Extracting log files.'
         expandFileArchive "$FILENAME"
     fi
 
-    echo -n 'Updating permissions and cleanup - '
+    echo 'Updating permissions and cleanup.'
 
     mkdir -p "${MAGENTO_ROOT}/var/log/"
     touch "${MAGENTO_ROOT}/var/log/${EXCEPTION_LOG_NAME}"
     touch "${MAGENTO_ROOT}/var/log/${SYSTEM_LOG_NAME}"
     chmod -R 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
     chmod -R 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
-
-    echo 'OK'
 }
 
 function expandFileArchive
@@ -290,33 +288,30 @@ function expandFileArchive
     # find . -name '._*' -print0 | xargs -0 rm
 
     if which pv > /dev/null; then
-        echo ':'
         case "$1" in
             *.tar.gz|*.tgz)
                 pv -B 8k "$1" | tar zxf - $TAR_EXCLUDES $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
             *.tar.bz2|*.tbz2|*.tbz)
                 pv -B 8k "$1" | tar jxf - $TAR_EXCLUDES $DDR_OPT -C "$MAGENTO_ROOT" 2>/dev/null ;;
-            *.gz)
-                gunzip -k "$1" ;;
-            *.bz|*.bz2)
-                bunzip2 -k "$1" ;;
+#             *.gz)
+#                 gunzip -k "$1" ;;
+#             *.bz|*.bz2)
+#                 bunzip2 -k "$1" ;;
             *)
                 echo "\"$1\" could not be extracted" >&2; exit 1 ;;
         esac
     else
-        echo -n ' - '
         # Modern versions of tar can automatically choose the decompression type when needed.
         case "$1" in
             *.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tbz)
                 tar xf "$1" $TAR_EXCLUDES $DDR_OPT -C "$MAGENTO_ROOT" ;;
-            *.gz)
-                gunzip -k "$1" ;;
-            *.bz|*.bz2)
-                bunzip2 -k "$1" ;;
+#             *.gz)
+#                 gunzip -k "$1" ;;
+#             *.bz|*.bz2)
+#                 bunzip2 -k "$1" ;;
             *)
                 echo "\"$1\" could not be extracted" >&2; exit 1 ;;
         esac
-        echo 'OK'
     fi
 }
 
@@ -330,7 +325,7 @@ function createDb
 
 function restoreDb()
 {
-    echo -n "Restoring DB from dump"
+    echo "Restoring DB from dump."
 
     FILENAME=$(ls -1 *.sql.* | head -n1)
 
@@ -338,25 +333,22 @@ function restoreDb()
 
     if [[ -z "$FILENAME" ]]
     then
-        echo 'DB dump absent' >&2
+        echo 'DB dump absent.' >&2
         exit 1
     fi
 
     if which pv > /dev/null
     then
-        echo ":"
         pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" $P_DBPASS --force $DBNAME 2>/dev/null
     else
-        echo -n " - "
         gunzip -c "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" $P_DBPASS --force $DBNAME 2>/dev/null
-        echo "OK"
     fi
 }
 
 ####################################################################################################
 function doDbReconfigure()
 {
-    echo -n "Replacing DB core config values. - "
+    echo "Replacing DB core config values."
 
     getMerchantLocalXmlValues
 
@@ -419,13 +411,12 @@ function doDbReconfigure()
     runMysqlQuery "UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
 
     runMysqlQuery "UPDATE ${TABLE_PREFIX}core_cache_option SET value = 0 WHERE 1"
-
-    echo "OK"
 }
 
 ##  Pass parameters as: key value
 function setConfigValue()
 {
+	# Using "insert...on duplicate key update" won't updat values in all scopes.
     runMysqlQuery "SELECT value FROM ${TABLE_PREFIX}core_config_data WHERE path = '$1' LIMIT 1"
     if [[ -z "$SQLQUERY_RESULT" ]]
     then
@@ -1005,15 +996,13 @@ INDEX_EOF
 
 function doFileReconfigure()
 {
-    echo -n "Reconfiguring files. - "
+    echo "Reconfiguring files."
 
     getOrigHtaccess
     getMediaOrigHtaccess
     getOrigLocalXml
     getOrigEnterpriseXml
     getOrigIndex
-
-    echo "OK"
 }
 
 ####################################################################################################
@@ -1054,15 +1043,6 @@ function installOnly()
 
 ####################################################################################################
 function gitAdd()
-{
-    echo -n "Wrapping deployment with local-only 'git' repository - "
-
-    gitAddQuiet
-
-    echo "OK"
-}
-
-function gitAddQuiet()
 {
     if [[ -e ".gitignore" ]]
     then
@@ -1179,6 +1159,7 @@ case "$MODE" in
 		# Add GIT repo if none exists.
 		if [[ ! -d ".git" ]]
 		then
+			echo "Wrapping deployment with local-only 'git' repository."
 			gitAdd
 		fi
         ;;
@@ -1190,6 +1171,7 @@ case "$MODE" in
         # Add GIT repo if this is not a redo.
 		if [[ ! -d ".git.merchant" ]]
 		then
+			echo "Wrapping deployment with local-only 'git' repository."
 			gitAdd
 		fi
         ;;
@@ -1212,7 +1194,7 @@ case "$MODE" in
 			# Add GIT repo if this is not a redo.
 			if [[ ! -d ".git.merchant" ]]
 			then
-				gitAddQuiet
+				gitAdd
 			fi
 		) &
         restoreDb
