@@ -19,7 +19,7 @@ Those messages can be ignored.
 > restore.sh
 ```
 
-This script is designed to be run from folder with Magento dumps.
+This script is designed to be run from a directory containing Magento dumps.
 It restores dump files created by Magento Support module or backup.sh script:
 > code dump (for ex. 5a9cefe85f8e1ccc2a5191553f31ab82.201607061906.sql.gz)
 
@@ -28,49 +28,53 @@ It restores dump files created by Magento Support module or backup.sh script:
 ## Options
 ```
 -c --config-file <file-name>
-        Specify a configuration file.
+		Specify a configuration file.
 
 -f --force
-        Install without pause to check data.
+		Install without pause to check data.
 
 -r --reconfigure
-        ReConfigure both files and DB in this deployment.
+		ReConfigure only files and DB.
 
 -i --install-only
-        Standard fresh install procedure through CLI.
+		Standard fresh install procedure through CLI.
 
 -m --mode <run-mode>
-        This must have one of the following:
-        "reconfigure", "install-only", "code", or "db"
-        The first two are optional usages of the previous two options.
-        "code" tells the script to only decompress the code, and
-        "db" to only move the data into the database.
+		This must have one of the following:
+		"reconfigure", "install-only", "code", or "db"
+		The first two are optional usages of the previous two options.
+		"code" tells the script to only decompress the code, and
+		"db" to only move the data into the database.
 
 -h --host <host-name>|<ip-address>
-        DB host IP address, defaults to "sparta-db".
+		DB host name or IP address, defaults to "sparta-db".
 
 -D --database <name-string>
-        Database or schema name.
+		Database or schema name.
 
 -u --user <user-name>
-        DB user name.
+		DB user name.
 
 -p --password <password>
-        DB password.
+		DB password. Default is empty. A password cannot contain spaces.
 
 -b --base-url <url>
-        Base URL for this deployment host.
+		Base URL for this deployment host.
+		Defaults to "http://web1.sparta.corp.magento.com/dev/rwoodbury/".
+		If this value is set here it is used precisely as given. If it's
+		not set then the default or config file value will be used and
+		appended with the working directory basename.
 
 -e --email <email-address>
-        Admin email address.
+		Admin email address.
 
 -l --locale <locale-code>
-        "base/locale/code" configuration value.
+		"base/locale/code" configuration value.
 ```
 
-This script can be located anywhere but it assumes the current working directory is the new deployment directory with the merchant's backup files. Your default "restore.conf" file must be manually created in your home directory.
+This script can be located anywhere but it assumes the current working directory is the new deployment directory with the merchant's backup files. Your default ".restore.conf" file must be manually created in your home directory. Or you can pass in the name of a configuration file.
 
-Missing entries are given default values. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used with the value in DEV_DB_PREFIX. Digits are allowed as a DB name. Sparta users might not even need a configuration file.
+Missing entries are given default values. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used with the value in DEV_DB_PREFIX. Digits only are allowed as a DB name. Sparta users might not even need a configuration file.
 
 Available config names with their default values are:
 ```
@@ -83,7 +87,7 @@ DBPASS=
 DBUSER="$USER"
 DEBUG_MODE=0
 DEV_DB_PREFIX="${USER}_"
-LOCALE_CODE='en_US'
+LOCALE_CODE=${LANG:0:5}
 ```
 
 ## Example
