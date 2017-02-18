@@ -5,7 +5,7 @@
 # Create file in home directory restore.conf
 # Or specify path to restore.conf
 
-trap "exit 1" INT SIGHUP SIGINT SIGTERM
+trap 'exit 1' INT SIGHUP SIGINT SIGTERM
 
 export LC_CTYPE=C
 export LANG=C
@@ -163,7 +163,7 @@ checkTools() {
 
     if [[ -n $MISSED_REQUIRED_TOOLS ]]
     then
-        echo "Unable to restore instance due to missing required tools: $MISSED_REQUIRED_TOOLS"
+        printf 'Unable to restore instance due to missing required tools:\n%s\n' "$MISSED_REQUIRED_TOOLS"
         exit 1
     fi
 }
@@ -228,11 +228,11 @@ ENDCHECK
 
     if [[ ${FORCE_RESTORE} -eq 0 ]]
     then
-        echo -n 'Continue? [Y/n]: '
+        printf 'Continue? [Y/n]: '
         read CONFIRM
 
         case "$CONFIRM" in
-            [Nn]|[Nn][Oo]) echo 'Canceled.'; exit ;;
+            [Nn]|[Nn][Oo]) printf 'Canceled.'; exit ;;
         esac
     fi
 
@@ -256,11 +256,11 @@ function extractCode()
 
     if [[ -z "$FILENAME" ]]
     then
-        echo "\"$FILENAME\" is not a valid file" >&2
+        printf '\nNo file name found.\n\n' >&2
         exit 1
     fi
 
-    echo 'Extracting code.'
+    printf 'Extracting code.\n'
     expandFileArchive "$FILENAME"
 
     mkdir -pm 2777 "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
@@ -269,11 +269,11 @@ function extractCode()
     FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '\.logs\.' | head -n1)
     if [[ -n "$FILENAME" ]]
     then
-        echo 'Extracting log files.'
+        printf 'Extracting log files.\n'
         expandFileArchive "$FILENAME"
     fi
 
-    echo 'Updating permissions and cleanup.'
+    printf 'Updating permissions and cleanup.\n'
 
     mkdir -p "${MAGENTO_ROOT}/var/log/"
     touch "${MAGENTO_ROOT}/var/log/${EXCEPTION_LOG_NAME}"
@@ -298,7 +298,7 @@ function expandFileArchive
 #             *.bz|*.bz2)
 #                 bunzip2 -k "$1" ;;
             *)
-                echo "\"$1\" could not be extracted" >&2; exit 1 ;;
+                printf '\n"%s" could not be extracted.\n\n' "$1" >&2; exit 1 ;;
         esac
     else
         # Modern versions of tar can automatically choose the decompression type when needed.
@@ -310,7 +310,7 @@ function expandFileArchive
 #             *.bz|*.bz2)
 #                 bunzip2 -k "$1" ;;
             *)
-                echo "\"$1\" could not be extracted" >&2; exit 1 ;;
+                printf '\n"%s" could not be extracted.\n\n' "$1" >&2; exit 1 ;;
         esac
     fi
 }
@@ -325,7 +325,7 @@ function createDb
 
 function restoreDb()
 {
-    echo "Restoring DB from dump."
+    printf 'Restoring DB from dump.\n'
 
     FILENAME=$(ls -1 *.sql.* | head -n1)
 
@@ -333,7 +333,7 @@ function restoreDb()
 
     if [[ -z "$FILENAME" ]]
     then
-        echo 'DB dump absent.' >&2
+        printf '\nDB dump absent.\n\n' >&2
         exit 1
     fi
 
@@ -348,7 +348,7 @@ function restoreDb()
 ####################################################################################################
 function doDbReconfigure()
 {
-    echo "Replacing DB core config values."
+    printf 'Replacing core config and other DB values.\n'
 
     getMerchantLocalXmlValues
 
@@ -398,12 +398,12 @@ function doDbReconfigure()
     deleteFromConfigWhere "LIKE 'admin/url/%'"
 
     runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user WHERE username = 'admin'"
-    USER_ID=$(echo "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
+    USER_ID=$(printf "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
 
     if [[ -z "$USER_ID" ]]
     then
         runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1"
-        USER_ID=$(echo "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
+        USER_ID=$(printf "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
     fi
 
     runMysqlQuery "UPDATE ${TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
@@ -416,7 +416,7 @@ function doDbReconfigure()
 ##  Pass parameters as: key value
 function setConfigValue()
 {
-	# Using "insert...on duplicate key update" won't updat values in all scopes.
+	# Using "insert...on duplicate key update" won't update values in all scopes.
     runMysqlQuery "SELECT value FROM ${TABLE_PREFIX}core_config_data WHERE path = '$1' LIMIT 1"
     if [[ -z "$SQLQUERY_RESULT" ]]
     then
@@ -441,13 +441,13 @@ function getMerchantLocalXmlValues()
     #   If empty then get the values.
     if [[ -z "$INSTALL_DATE" ]]
     then
-        getLocalXmlValue "table_prefix"
+        getLocalXmlValue 'table_prefix'
         TABLE_PREFIX="$PARAMVALUE"
 
-        getLocalXmlValue "date"
+        getLocalXmlValue 'date'
         INSTALL_DATE="$PARAMVALUE"
 
-        getLocalXmlValue "key"
+        getLocalXmlValue 'key'
         CRYPT_KEY="$PARAMVALUE"
     fi
 }
@@ -456,17 +456,17 @@ getLocalXmlValue()
 {
     # First look for value surrounded by "CDATA" construct.
     LOCAL_XML_SEARCH="s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p"
-    debug "local XML search string" "$LOCAL_XML_SEARCH"
+    debug 'local XML search string' "$LOCAL_XML_SEARCH"
     PARAMVALUE=$(sed -n -e "$LOCAL_XML_SEARCH" "$ORIGINAL_LOCAL_XML" | head -n 1)
-    debug "local XML found" "$PARAMVALUE"
+    debug 'local XML found' "$PARAMVALUE"
 
     # If not found then try searching without.
     if [[ -z "$PARAMVALUE" ]]
     then
         LOCAL_XML_SEARCH="s/.*<${1}>\(.*\)<\/${1}>.*/\1/p"
-        debug "local XML search string" "$LOCAL_XML_SEARCH"
+        debug 'local XML search string' "$LOCAL_XML_SEARCH"
         PARAMVALUE=$(sed -n -e "$LOCAL_XML_SEARCH" "$ORIGINAL_LOCAL_XML" | head -n 1)
-        debug "local XML found" "$PARAMVALUE"
+        debug 'local XML found' "$PARAMVALUE"
 
         # Prevent disaster.
         if [[ "$PARAMVALUE" = '<![CDATA[]]>' ]]
@@ -483,7 +483,7 @@ function debug()
         return
     fi
 
-    echo "KEY: $1  VALUE: $2"
+    printf 'KEY: %s\nVALUE: %s\n\n' "$1" "$2"
 }
 
 function getOrigHtaccess()
@@ -996,7 +996,7 @@ INDEX_EOF
 
 function doFileReconfigure()
 {
-    echo "Reconfiguring files."
+    printf 'Reconfiguring files.\n'
 
     getOrigHtaccess
     getMediaOrigHtaccess
@@ -1010,11 +1010,11 @@ function installOnly()
 {
     if [[ -f "${MAGENTO_ROOT}/app/etc/local.xml" ]]
     then
-        echo "Magento already installed, rm app/etc/local.xml file to reinstall" >&2
+        printf '\nMagento already installed, rm app/etc/local.xml file to reinstall\n\n' >&2
         exit 1;
     fi
 
-    echo "Performing Magento install."
+    printf 'Performing Magento install.\n'
 
     mkdir -p "${MAGENTO_ROOT}/var/log/"
     chmod 2777 "${MAGENTO_ROOT}/var"
@@ -1028,7 +1028,7 @@ function installOnly()
     then
         THIS_PHP="$ALT_PHP"
     else
-        THIS_PHP="php"
+        THIS_PHP='php'
     fi
 
     "$THIS_PHP" -f install.php -- --license_agreement_accepted yes --locale $LOCALE_CODE \
@@ -1044,7 +1044,7 @@ function installOnly()
 ####################################################################################################
 function gitAdd()
 {
-    if [[ -e ".gitignore" ]]
+    if [[ -e '.gitignore' ]]
     then
         mv -f .gitignore .gitignore.merchant
     fi
@@ -1066,7 +1066,7 @@ function gitAdd()
 
 GIT_IGNORE_EOF
 
-    if [[ -e ".git" ]]
+    if [[ -e '.git' ]]
     then
     	rm -rf .git.merchant
         mv -f .git .git.merchant
@@ -1085,7 +1085,7 @@ GIT_IGNORE_EOF
         '\./\.git/.*|\./media/.*|\./var/.*|.*\.svn/.*|\./\.idea/.*|.*\.gz|.*\.tgz|.*\.bz|.*\.bz2|.*\.tbz2|.*\.tbz|.*\.zip|.*\.tar|.*DS_Store' \
         -print0 | xargs -0 git add -f
 
-    git commit -m "initial merchant deployment" >/dev/null 2>&1
+    git commit -m 'initial merchant deployment' >/dev/null 2>&1
 }
 
 
@@ -1101,8 +1101,7 @@ OPTIONS=`getopt -o Hc:frim:h:D:u:p:b:e:l: -l help,config-file:,force,reconfigure
 
 if [[ $? != 0 ]]
 then
-    echo "Failed parsing options." >&2
-    echo
+    printf '\nFailed parsing options.\n\n' >&2
     showHelp
     exit 1
 fi
@@ -1114,8 +1113,8 @@ while true; do
         -H|--help )             showHelp; exit 0;;
         -c|--config-file )      OPT_CONFIG_FILE="$2"; shift 2;;
         -f|--force )            FORCE_RESTORE=1; shift 1;;
-        -r|--reconfigure )      MODE="reconfigure"; shift 1;;
-        -i|--install-only )     MODE="install-only"; shift 1;;
+        -r|--reconfigure )      MODE='reconfigure'; shift 1;;
+        -i|--install-only )     MODE='install-only'; shift 1;;
         -m|--mode )             MODE="$2"; shift 2;;
         -h|--host )             OPT_DBHOST="$2"; shift 2;;
         -D|--database )         OPT_DBNAME="$2"; shift 2;;
@@ -1125,7 +1124,7 @@ while true; do
         -e|--email )            OPT_ADMIN_EMAIL="$2"; shift 2;;
         -l|--locale )           OPT_LOCALE_CODE="$2"; shift 2;;
         -- ) shift; break;;
-        * ) echo "Internal getopt parse error."; echo; showHelp; exit 1;;
+        * ) printf 'Internal getopt parse error.\n\n'; showHelp; exit 1;;
     esac
 done
 
@@ -1137,7 +1136,7 @@ done
 case "$MODE" in
     reconfigure|install-only|code|db) ;;
     '') ;;
-    *) echo "Bad mode."; echo; showHelp; exit 1 ;;
+    *) printf 'Bad mode.\n\n'; showHelp; exit 1 ;;
 esac
 
 initVariables
@@ -1157,9 +1156,9 @@ case "$MODE" in
         installOnly
 		doDbReconfigure
 		# Add GIT repo if none exists.
-		if [[ ! -d ".git" ]]
+		if [[ ! -d '.git' ]]
 		then
-			echo "Wrapping deployment with local-only 'git' repository."
+			printf 'Wrapping deployment with local-only "git" repository.\n'
 			gitAdd
 		fi
         ;;
@@ -1169,9 +1168,9 @@ case "$MODE" in
         extractCode
         doFileReconfigure
         # Add GIT repo if this is not a redo.
-		if [[ ! -d ".git.merchant" ]]
+		if [[ ! -d '.git.merchant' ]]
 		then
-			echo "Wrapping deployment with local-only 'git' repository."
+			printf 'Wrapping deployment with local-only "git" repository.\n'
 			gitAdd
 		fi
         ;;
@@ -1192,7 +1191,7 @@ case "$MODE" in
         # create repository in background
         (
 			# Add GIT repo if this is not a redo.
-			if [[ ! -d ".git.merchant" ]]
+			if [[ ! -d '.git.merchant' ]]
 			then
 				gitAdd
 			fi
