@@ -10,6 +10,8 @@
 
 These changes have been tested with Ubuntu 14.04 Server, Debian 8, OS X 10.11 and 10.12, and on 'aws-sparta-web1'.
 
+Code was added to accept other file endings other than ".gz" and to also to accept Bzip2 archives. These alternate endings have not been tested.
+
 Some systems might display the message
 > mdoc warning: Empty input line #
 Those messages can be ignored.
@@ -28,48 +30,48 @@ It restores dump files created by Magento Support module or backup.sh script:
 ## Options
 ```
 -c --config-file <file-name>
-		Specify a configuration file.
+        Specify a configuration file.
 
 -f --force
-		Install without pause to check data.
+        Install without pause to check data.
 
 -r --reconfigure
-		ReConfigure only files and DB.
+        ReConfigure only files and DB.
 
 -i --install-only
-		Standard fresh install procedure through CLI.
+        Standard fresh install procedure through CLI.
 
 -m --mode <run-mode>
-		This must have one of the following:
-		"reconfigure", "install-only", "code", or "db"
-		The first two are optional usages of the previous two options.
-		"code" tells the script to only decompress the code, and
-		"db" to only move the data into the database.
+        This must have one of the following:
+        "reconfigure", "install-only", "code", or "db"
+        The first two are optional usages of the previous two options.
+        "code" tells the script to only decompress the code, and
+        "db" to only move the data into the database.
 
 -h --host <host-name>|<ip-address>
-		DB host name or IP address, defaults to "sparta-db".
+        DB host name or IP address, defaults to "sparta-db".
 
 -D --database <name-string>
-		Database or schema name.
+        Database or schema name.
 
 -u --user <user-name>
-		DB user name.
+        DB user name.
 
 -p --password <password>
-		DB password. Default is empty. A password cannot contain spaces.
+        DB password. Default is empty. A password cannot contain spaces.
 
 -b --base-url <url>
-		Base URL for this deployment host.
-		Defaults to "http://web1.sparta.corp.magento.com/dev/rwoodbury/".
-		If this value is set here it is used precisely as given. If it's
-		not set then the default or config file value will be used and
-		appended with the working directory basename.
+        Base URL for this deployment host.
+        Defaults to "http://web1.sparta.corp.magento.com/dev/rwoodbury/".
+        If this value is set here it is used precisely as given. If it's
+        not set then the default or config file value will be used and
+        appended with the working directory basename.
 
 -e --email <email-address>
-		Admin email address.
+        Admin email address.
 
 -l --locale <locale-code>
-		"base/locale/code" configuration value.
+        "base/locale/code" configuration value.
 ```
 
 This script can be located anywhere but it assumes the current working directory is the new deployment directory with the merchant's backup files. Your default ".restore.conf" file must be manually created in your home directory. Or you can pass in the name of a configuration file.
