@@ -30,13 +30,13 @@ It restores dump files created by Magento Support module or backup.sh script:
 ## Options
 ```
 -c --config-file <file-name>
-        Specify a configuration file.
+        Specify an additional configuration file.
 
--f --force
+-F --force
         Install without pause to check data.
 
 -r --reconfigure
-        ReConfigure only files and DB.
+        Reconfigure files and DB only.
 
 -i --install-only
         Standard fresh install procedure through CLI.
@@ -53,70 +53,71 @@ It restores dump files created by Magento Support module or backup.sh script:
 
 -D --database <name-string>
         Database or schema name.
+        Defaults to "rwoodbury_" plus the current directory name.
 
 -u --user <user-name>
-        DB user name.
+        DB user name. Defaults to "rwoodbury".
 
 -p --password <password>
         DB password. Default is empty. A password cannot contain spaces.
 
--b --base-url <url>
-        Base URL for this deployment host.
-        Defaults to "http://web1.sparta.corp.magento.com/dev/rwoodbury/".
-        If this value is set here it is used precisely as given. If it's
-        not set then the default or config file value will be used and
-        appended with the working directory basename.
+-f --full-instance-url <url>
+        Full instance URL for this deployment host.
+        Defaults to "http://web1.sparta.corp.magento.com/dev/rwoodbury/<dev sub dir>/".
+        If it's not set then the default or config file value will be used
+        and appended with the working directory basename.
 
 -e --email <email-address>
-        Admin email address.
+        Admin email address. Defaults to "rwoodbury@magento.com".
 
 -l --locale <locale-code>
-        "base/locale/code" configuration value.
+        "base/locale/code" configuration value. Defaults to "en_US".
 ```
 
-This script can be located anywhere but it assumes the current working directory is the new deployment directory with the merchant's backup files. Your default ".restore.conf" file must be manually created in your home directory. Or you can pass in the name of a configuration file.
+This script can be located anywhere but it assumes the current working directory is the new deployment directory with the merchant's backup files. Your ".restore.conf" file must be manually created in your home directory.
 
-Missing entries are given default values. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB name, if the DB name is empty in the config file and none is entered on the command line then the current working directory basename is used with the value in DEV_DB_PREFIX. Digits only are allowed as a DB name. Sparta users might not even need a configuration file.
+Missing entries are given default values. In most cases, if the requested value is not included on the command line then the corresponding value from the config file is used. In the special case of the DB schema name, if the name is empty in the config file and none is entered on the command line then the current working directory basename is used with the value in SCHEMA_PREFIX. Digits are allowed as a DB name. Sparta users might not need a configuration file.
 
-Available config names with their default values are:
+Some of the available config names with their default values are:
 ```
 ADMIN_EMAIL="${USER}@magento.com"
-ALT_PHP=
 BASE_URL="http://web1.sparta.corp.magento.com/dev/${USER}/"
-DBHOST='sparta-db'
-DBNAME=
-DBPASS=
-DBUSER="$USER"
+DB_HOST='sparta-db'
+DB_SCHEMA=
+DB_PASS=
+DB_USER="$USER"
 DEBUG_MODE=0
-DEV_DB_PREFIX="${USER}_"
+SCHEMA_PREFIX="${USER}_"
 LOCALE_CODE=${LANG:0:5}
 ```
 
 ## Example
 This is the contents of my "~/.restore.conf" that is running on my OS X workstation:
 ```
-DBHOST=localhost
-DBUSER=magento
-DBPASS=magpass
-DEV_DB_PREFIX=
+DB_HOST=localhost
+DB_USER=magento
+DB_PASS=magpass
+SCHEMA_PREFIX=
 BASE_URL=http://localhost/
-ALT_PHP=/Applications/MAMP/bin/php/php5.6.28/bin/php
 ```
 
 Say you're working on SUPEE-9999 and your web root is "/Users/rwoodbury/deploys/". Place your dump files in a directory inside your working web root, say "/Users/rwoodbury/deploys/9999/". You should see something like this (and type "n" or "no" to cancel the process):
 ```
-ip-10-236-8-17:9999 rwoodbury$ ./restore.sh
+CVR-LM-00716168:9999 rwoodbury$ ./restore.sh
 Check parameters:
+Admin username is: admin
+Admin email is: rwoodbury@magento.com
+Admin password is: 123123q
 DB host is: localhost
 DB name is: 9999
 DB user is: magento
 DB pass is: magpass
-Full base url is: http://localhost/9999/
-Admin email is: rwoodbury@magento.com
+Full instance url is: http://localhost/9999/
 Locale code is: en_US
+Timezone is: America/Los_Angeles
 Continue? [Y/n]: n
-Interrupted by user, exiting...
-ip-10-236-8-17:9999 rwoodbury$
+Canceled.
+CVR-LM-00716168:9999 rwoodbury$
 ```
 
 # Progress bar

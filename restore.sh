@@ -2,26 +2,32 @@
 # Magento restore script
 #
 # You can use config file
-# Create file in home directory restore.conf
-# Or specify path to restore.conf
+# Create file in home directory .restore.conf
+# Or specify path to properly formatted file
 
 trap 'exit 1' INT SIGHUP SIGINT SIGTERM
 
 export LC_CTYPE=C
-export LANG=C
+# export LANG=C
 
 ####################################################################################################
 #Define variables
-DBHOST='sparta-db'
-DBNAME=
-DBUSER="$USER"
-DBPASS=
-P_DBPASS=
-DEV_DB_PREFIX="${USER}_"
-BASE_URL="http://web1.sparta.corp.magento.com/dev/${USER}/"
-# DEV_TABLE_PREFIX=
+CONFIG_FILE_PATH="${HOME}/.restore.conf"
 
-ALT_PHP=
+MAGENTO_ROOT="$PWD"
+INSTANCE_DIR_NAME=$(basename "$MAGENTO_ROOT")
+
+DB_HOST='sparta-db'
+SCHEMA_PREFIX="${USER}_"
+# The variable DB_SCHEMA is often not quoted throughout the script as it should always appear as one word.
+DB_SCHEMA=
+# The variables DB_USER and DB_PASS are quoted throughout the script as they could contain spaces.
+DB_USER="$USER"
+DB_PASS=
+P_DB_PASS=
+BASE_URL="http://web1.sparta.corp.magento.com/dev/${USER}/"
+FULL_INSTANCE_URL=
+# DEV_TABLE_PREFIX=
 
 TABLE_PREFIX=
 CRYPT_KEY=
@@ -32,15 +38,16 @@ DDR_OPT=
 
 TAR_EXCLUDES="--exclude='._*' --exclude='var/cache' --exclude='var/full_page_cache'"
 
-MAGENTO_ROOT="$PWD"
+LOCALE_CODE=${LANG:0:5}
+TIMEZONE=$TZ
 
-CONFIG_FILE_NAME='.restore.conf'
-CONFIG_FILE="${HOME}/${CONFIG_FILE_NAME}"
-DEPLOY_DIR_NAME=$(basename "$MAGENTO_ROOT")
-ADMIN_EMAIL="${USER}@magento.com"
-LOCALE_CODE='en_US'
 EXCEPTION_LOG_NAME='exception_dev.log'
 SYSTEM_LOG_NAME='system_dev.log'
+
+ADMIN_EMAIL="${USER}@magento.com"
+ADMIN_USERNAME='admin'
+ADMIN_PASSWORD='123123q'
+ADMIN_PASSWD_HASH='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D'
 
 # Source of original values when doing a restore from dumps.
 ORIGINAL_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml.merchant"
@@ -60,14 +67,13 @@ Usage: ${0} [option]
             Show available params for script (this screen).
 
     -c --config-file <file-name>
-            Specify a configuration file.
-            Defaults to "${CONFIG_FILE}".
+            Specify an additional configuration file.
 
-    -f --force
+    -F --force
             Install without pause to check data.
 
     -r --reconfigure
-            ReConfigure only files and DB.
+            Reconfigure files and DB only.
 
     -i --install-only
             Standard fresh install procedure through CLI.
@@ -92,12 +98,11 @@ Usage: ${0} [option]
     -p --password <password>
             DB password. Default is empty. A password cannot contain spaces.
 
-    -b --base-url <url>
-            Base URL for this deployment host.
-            Defaults to "http://web1.sparta.corp.magento.com/dev/${USER}/".
-            If this value is set here it is used precisely as given. If it's
-            not set then the default or config file value will be used and
-            appended with the working directory basename.
+    -f --full-instance-url <url>
+            Full instance URL for this deployment host.
+            Defaults to "http://web1.sparta.corp.magento.com/dev/${USER}/<dev sub dir>/".
+            If it's not set then the default or config file value will be used
+            and appended with the working directory basename.
 
     -e --email <email-address>
             Admin email address. Defaults to "${USER}@magento.com".
@@ -106,42 +111,40 @@ Usage: ${0} [option]
             "base/locale/code" configuration value. Defaults to "${LOCALE_CODE}".
 
 This script can be located anywhere but it assumes the current working directory
-is the new deployment directory with the merchant's backup files. Your default
-"${CONFIG_FILE_NAME}" file must be manually created in your home directory.
+is the new deployment directory with the merchant's backup files. Your
+".restore.conf" file must be manually created in your home directory.
 
 Missing entries are given default values. In most cases, if the requested
 value is not included on the command line then the corresponding value from the
-config file is used. In the special case of the DB name, if the DB name is
+config file is used. In the special case of the DB schema name, if the name is
 empty in the config file and none is entered on the command line then the
-current working directory basename is used with the value in DEV_DB_PREFIX.
+current working directory basename is used with the value in SCHEMA_PREFIX.
 Digits are allowed as a DB name. Sparta users might not need a configuration file.
 
-Available config names with their default values are:
+Some of the available config names with their default values are:
 ADMIN_EMAIL=${ADMIN_EMAIL}
-ALT_PHP=
 BASE_URL=${BASE_URL}
-DBHOST=${DBHOST}
-DBNAME=
-DBPASS=
-DBUSER=${DBUSER}
+DB_HOST=${DB_HOST}
+DB_SCHEMA=
+DB_PASS=
+DB_USER=${DB_USER}
 DEBUG_MODE=0
-DEV_DB_PREFIX=${DEV_DB_PREFIX}
+SCHEMA_PREFIX=${SCHEMA_PREFIX}
 LOCALE_CODE=${LOCALE_CODE}
 
-Sample "${CONFIG_FILE_NAME}" on a local OSX workstation with MAMP:
-DBHOST=localhost
-DBUSER=magento
-DBPASS=magpass
-DEV_DB_PREFIX=
+Sample ".restore.conf" on a local OSX workstation with MAMP:
+DB_HOST=localhost
+DB_USER=magento
+DB_PASS=magpass
+SCHEMA_PREFIX=
 BASE_URL=http://localhost/
-ALT_PHP=/Applications/MAMP/bin/php/php5.6.28/bin/php
 
 NOTE: OS X users will need to install a newer version of "getopt" from a
 repository like MacPorts:
 > sudo port install getopt
 
-Also note that OS X MAMP users will need to be sure "/Applications/MAMP/Library/bin"
-is in the command path.
+Also note that xAMP users will need to be sure their desired version of PHP is
+in the command path.
 
 ENDHELP
 
@@ -171,59 +174,34 @@ checkTools() {
 ####################################################################################################
 function initVariables()
 {
-    CONFIG_FILE="${OPT_CONFIG_FILE:-$CONFIG_FILE}"
-
-    # Read defaults from config file. They will overwrite corresponding variables.
-    if [[ -f "$CONFIG_FILE" ]]
+    # Read from optional config file. They will overwrite corresponding variables.
+    if [[ -f "$OPT_CONFIG_FILE" ]]
     then
-        source "$CONFIG_FILE"
+        source "$OPT_CONFIG_FILE"
     fi
 
-
-    DBHOST="${OPT_DBHOST:-$DBHOST}"
-
-    if [[ -z $DBNAME ]]
+    if [[ -z "$DB_SCHEMA" ]]
     then
-        DBNAME="$DEV_DB_PREFIX$DEPLOY_DIR_NAME"
+        DB_SCHEMA="$SCHEMA_PREFIX$INSTANCE_DIR_NAME"
     fi
 
-    # The variable DBNAME is often not quoted throughout the script as it should always appear as one word.
-    DBNAME="${OPT_DBNAME:-$DBNAME}"
-    # The variables DBUSER and DBPASS are quoted throughout the script as they could contain spaces.
-    DBUSER="${OPT_DBUSER:-$DBUSER}"
-    DBPASS="${OPT_DBPASS:-$DBPASS}"
-
-#   if [[ $DBNAME != "$DEPLOY_DIR_NAME" ]]
-#   then
-#       DEV_TABLE_PREFIX="${DEPLOY_DIR_NAME}_"
-#   fi
-#   echo -n "Enter developer table prefix [[${DEV_TABLE_PREFIX}]]: "
-#   read TMP_DEV_TABLE_PREFIX
-#   if [[ -n "$TMP_DEV_TABLE_PREFIX" ]]
-#   then
-#       DEV_TABLE_PREFIX=$TMP_DEV_TABLE_PREFIX
-#   fi
-
-    BASE_URL="${OPT_BASE_URL:-$BASE_URL}"
-
-    if [[ -z "$OPT_BASE_URL" ]]
+    if [[ -z "$FULL_INSTANCE_URL" ]]
     then
-        BASE_URL="${BASE_URL}${DEPLOY_DIR_NAME}/"
+        FULL_INSTANCE_URL="${BASE_URL}${INSTANCE_DIR_NAME}/"
     fi
-
-    ADMIN_EMAIL="${OPT_ADMIN_EMAIL:-$ADMIN_EMAIL}"
-
-    LOCALE_CODE="${OPT_LOCALE_CODE:-$LOCALE_CODE}"
 
     cat <<ENDCHECK
 Check parameters:
-DB host is: $DBHOST
-DB name is: $DBNAME
-DB user is: $DBUSER
-DB pass is: $DBPASS
-Full base url is: $BASE_URL
+Admin username is: $ADMIN_USERNAME
 Admin email is: $ADMIN_EMAIL
+Admin password is: $ADMIN_PASSWORD
+DB host is: $DB_HOST
+DB name is: $DB_SCHEMA
+DB user is: $DB_USER
+DB pass is: $DB_PASS
+Full instance url is: $FULL_INSTANCE_URL
 Locale code is: $LOCALE_CODE
+Timezone is: $TIMEZONE
 ENDCHECK
 
     if [[ ${FORCE_RESTORE} -eq 0 ]]
@@ -232,13 +210,13 @@ ENDCHECK
         read CONFIRM
 
         case "$CONFIRM" in
-            [Nn]|[Nn][Oo]) printf 'Canceled.'; exit ;;
+            [Nn]|[Nn][Oo]) printf 'Canceled.\n'; exit ;;
         esac
     fi
 
-    if [[ -n $DBPASS ]]
+    if [[ -n "$DB_PASS" ]]
     then
-        P_DBPASS="-p$DBPASS"
+        P_DB_PASS="-p$DB_PASS"
     fi
 
     if [[ -n `man tar | grep delay-directory-restore` ]]
@@ -318,9 +296,9 @@ function expandFileArchive
 ####################################################################################################
 function createDb
 {
-    mysqladmin --force -h"$DBHOST" -u"$DBUSER" $P_DBPASS drop $DBNAME &>/dev/null
+    mysqladmin --force -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS drop $DB_SCHEMA &>/dev/null
 
-    mysqladmin -h"$DBHOST" -u"$DBUSER" $P_DBPASS create $DBNAME 2>/dev/null
+    mysqladmin -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS create $DB_SCHEMA 2>/dev/null
 }
 
 function restoreDb()
@@ -339,9 +317,9 @@ function restoreDb()
 
     if which pv > /dev/null
     then
-        pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" $P_DBPASS --force $DBNAME 2>/dev/null
+        pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS --force $DB_SCHEMA 2>/dev/null
     else
-        gunzip -c "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DBHOST" -u"$DBUSER" $P_DBPASS --force $DBNAME 2>/dev/null
+        gunzip -c "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS --force $DB_SCHEMA 2>/dev/null
     fi
 }
 
@@ -378,6 +356,7 @@ function doDbReconfigure()
     setConfigValue 'dev/log/file' "$SYSTEM_LOG_NAME"
 
     setConfigValue 'general/locale/code' "$LOCALE_CODE"
+    setConfigValue 'general/locale/timezone' "$TIMEZONE"
 
     setConfigValue 'system/csrf/use_form_key' '0'
     setConfigValue 'system/page_cache/multicurrency' '0'
@@ -387,9 +366,9 @@ function doDbReconfigure()
     setConfigValue 'web/cookie/cookie_path' ''
     setConfigValue 'web/cookie/cookie_lifetime' '0'
 
-    setConfigValue 'web/secure/base_url' "$BASE_URL"
+    setConfigValue 'web/secure/base_url' "$FULL_INSTANCE_URL"
     setConfigValue 'web/secure/use_in_adminhtml' '0'
-    setConfigValue 'web/unsecure/base_url' "$BASE_URL"
+    setConfigValue 'web/unsecure/base_url' "$FULL_INSTANCE_URL"
 
     deleteFromConfigWhere "IN ('web/unsecure/base_link_url', 'web/unsecure/base_skin_url', 'web/unsecure/base_media_url', 'web/unsecure/base_js_url')"
 
@@ -397,8 +376,15 @@ function doDbReconfigure()
 
     deleteFromConfigWhere "LIKE 'admin/url/%'"
 
-    runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user WHERE username = 'admin'"
-    USER_ID=$(printf "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_cache_option SET value = 0 WHERE 1"
+
+
+    # Get "user_id" of first item in table, if any. Likely this is the user with the highest permission level.
+    runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1"
+    debug 'SQLQUERY_RESULT' "$SQLQUERY_RESULT"
+
+    USER_ID=$(printf "$SQLQUERY_RESULT" | tr -Cd '[:digit:]');
+    debug 'USER_ID' "$USER_ID"
 
     if [[ -z "$USER_ID" ]]
     then
@@ -406,17 +392,15 @@ function doDbReconfigure()
         USER_ID=$(printf "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
     fi
 
-    runMysqlQuery "UPDATE ${TABLE_PREFIX}admin_user SET password='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D', username='admin', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
+    runMysqlQuery "UPDATE ${TABLE_PREFIX}admin_user SET password='${ADMIN_PASSWD_HASH}', username='${ADMIN_USERNAME}', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
 
     runMysqlQuery "UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
-
-    runMysqlQuery "UPDATE ${TABLE_PREFIX}core_cache_option SET value = 0 WHERE 1"
 }
 
 ##  Pass parameters as: key value
 function setConfigValue()
 {
-	# Using "insert...on duplicate key update" won't update values in all scopes.
+    # Using "insert...on duplicate key update" won't update values in all scopes.
     runMysqlQuery "SELECT value FROM ${TABLE_PREFIX}core_config_data WHERE path = '$1' LIMIT 1"
     if [[ -z "$SQLQUERY_RESULT" ]]
     then
@@ -433,7 +417,7 @@ function deleteFromConfigWhere()
 
 function runMysqlQuery()
 {
-    SQLQUERY_RESULT=$(mysql -h$DBHOST -u"$DBUSER" $P_DBPASS -D $DBNAME -e "$1" 2>/dev/null);
+    SQLQUERY_RESULT=$(mysql -h$DB_HOST -u"$DB_USER" $P_DB_PASS -D $DB_SCHEMA -e "$1" 2>/dev/null);
 }
 
 function getMerchantLocalXmlValues()
@@ -804,10 +788,10 @@ function getOrigLocalXml()
             </db>
             <default_setup>
                 <connection>
-                    <host><![CDATA[${DBHOST}]]></host>
-                    <username><![CDATA[${DBUSER}]]></username>
-                    <password><![CDATA[${DBPASS}]]></password>
-                    <dbname><![CDATA[${DBNAME}]]></dbname>
+                    <host><![CDATA[${DB_HOST}]]></host>
+                    <username><![CDATA[${DB_USER}]]></username>
+                    <password><![CDATA[${DB_PASS}]]></password>
+                    <dbname><![CDATA[${DB_SCHEMA}]]></dbname>
                     <initStatements><![CDATA[SET NAMES utf8]]></initStatements>
                     <model><![CDATA[mysql4]]></model>
                     <type><![CDATA[pdo_mysql]]></type>
@@ -1024,21 +1008,14 @@ function installOnly()
 
     chmod 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/media"
 
-    if [[ -n "$ALT_PHP" && -f "$ALT_PHP" ]]
-    then
-        THIS_PHP="$ALT_PHP"
-    else
-        THIS_PHP='php'
-    fi
-
-    "$THIS_PHP" -f install.php -- --license_agreement_accepted yes --locale $LOCALE_CODE \
-        --timezone `"$THIS_PHP" -r 'echo date_default_timezone_get();'` --default_currency USD \
-        --db_host $DBHOST --db_name $DBNAME --db_user "$DBUSER" --db_pass "$DBPASS" \
-        --url "$BASE_URL" --use_rewrites yes \
-        --use_secure no --secure_base_url "$BASE_URL" --use_secure_admin no \
+    php -f install.php -- --license_agreement_accepted yes --locale $LOCALE_CODE \
+        --timezone $TIMEZONE --default_currency USD \
+        --db_host $DB_HOST --db_name $DB_SCHEMA --db_user "$DB_USER" --db_pass "$DB_PASS" \
+        --url "$FULL_INSTANCE_URL" --use_rewrites yes \
+        --use_secure no --secure_base_url "$FULL_INSTANCE_URL" --use_secure_admin no \
         --skip_url_validation yes \
-        --admin_lastname Owner --admin_firstname Store --admin_email "$ADMIN_EMAIL" \
-        --admin_username admin --admin_password 123123q
+        --admin_firstname Store --admin_lastname Owner --admin_email "$ADMIN_EMAIL" \
+        --admin_username "$ADMIN_USERNAME" --admin_password "$ADMIN_PASSWORD"
 }
 
 ####################################################################################################
@@ -1068,7 +1045,7 @@ GIT_IGNORE_EOF
 
     if [[ -e '.git' ]]
     then
-    	rm -rf .git.merchant
+        rm -rf .git.merchant
         mv -f .git .git.merchant
     fi
 
@@ -1096,8 +1073,24 @@ GIT_IGNORE_EOF
 checkTools
 
 ####################################################################################################
+# Set timezone default after checking for tools.
+if [[ -z "$TIMEZONE" ]]
+then
+    TIMEZONE=`php -r 'echo date_default_timezone_get();'`
+fi
+
+# Read defaults from config file. They will overwrite corresponding variables.
+if [[ -f "$CONFIG_FILE_PATH" ]]
+then
+    source "$CONFIG_FILE_PATH"
+fi
+
+####################################################################################################
 #   Parse options and set environment.
-OPTIONS=`getopt -o Hc:frim:h:D:u:p:b:e:l: -l help,config-file:,force,reconfigure,install,mode:,host:,database:,user:,password:,base-url:,email:,locale: -n "$0" -- "$@"`
+OPTIONS=`getopt \
+    -o Hc:Frim:h:D:u:p:f:b:e:l: \
+    -l help,config-file:,force,reconfigure,install,mode:,host:,database:,user:,password:,full-instance-url:,email:,locale: \
+    -n "$0" -- "$@"`
 
 if [[ $? != 0 ]]
 then
@@ -1110,19 +1103,19 @@ eval set -- "$OPTIONS"
 
 while true; do
     case "$1" in
-        -H|--help )             showHelp; exit 0;;
-        -c|--config-file )      OPT_CONFIG_FILE="$2"; shift 2;;
-        -f|--force )            FORCE_RESTORE=1; shift 1;;
-        -r|--reconfigure )      MODE='reconfigure'; shift 1;;
-        -i|--install-only )     MODE='install-only'; shift 1;;
-        -m|--mode )             MODE="$2"; shift 2;;
-        -h|--host )             OPT_DBHOST="$2"; shift 2;;
-        -D|--database )         OPT_DBNAME="$2"; shift 2;;
-        -u|--user )             OPT_DBUSER="$2"; shift 2;;
-        -p|--password )         OPT_DBPASS="$2"; shift 2;;
-        -b|--base-url )         OPT_BASE_URL="$2"; shift 2;;
-        -e|--email )            OPT_ADMIN_EMAIL="$2"; shift 2;;
-        -l|--locale )           OPT_LOCALE_CODE="$2"; shift 2;;
+        -H|--help )                 showHelp; exit 0;;
+        -c|--config-file )          OPT_CONFIG_FILE="$2"; shift 2;;
+        -F|--force )                FORCE_RESTORE=1; shift 1;;
+        -r|--reconfigure )          MODE='reconfigure'; shift 1;;
+        -i|--install-only )         MODE='install-only'; shift 1;;
+        -m|--mode )                 MODE="$2"; shift 2;;
+        -h|--host )                 DB_HOST="$2"; shift 2;;
+        -D|--database )             DB_SCHEMA="$2"; shift 2;;
+        -u|--user )                 DB_USER="$2"; shift 2;;
+        -p|--password )             DB_PASS="$2"; shift 2;;
+        -f|--full-instance-url )    FULL_INSTANCE_URL="$2"; shift 2;;
+        -e|--email )                ADMIN_EMAIL="$2"; shift 2;;
+        -l|--locale )               LOCALE_CODE="$2"; shift 2;;
         -- ) shift; break;;
         * ) printf 'Internal getopt parse error.\n\n'; showHelp; exit 1;;
     esac
@@ -1150,17 +1143,17 @@ case "$MODE" in
 
     # --install-only
     install-only)
-    	# In this case there is no merchant version of the file.
+        # In this case there is no merchant version of the file.
         ORIGINAL_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml"
         createDb
         installOnly
-		doDbReconfigure
-		# Add GIT repo if none exists.
-		if [[ ! -d '.git' ]]
-		then
-			printf 'Wrapping deployment with local-only "git" repository.\n'
-			gitAdd
-		fi
+        doDbReconfigure
+        # Add GIT repo if none exists.
+        if [[ ! -d '.git' ]]
+        then
+            printf 'Wrapping deployment with local-only git repository.\n'
+            gitAdd
+        fi
         ;;
 
     # --mode code
@@ -1168,11 +1161,11 @@ case "$MODE" in
         extractCode
         doFileReconfigure
         # Add GIT repo if this is not a redo.
-		if [[ ! -d '.git.merchant' ]]
-		then
-			printf 'Wrapping deployment with local-only "git" repository.\n'
-			gitAdd
-		fi
+        if [[ ! -d '.git.merchant' ]]
+        then
+            printf 'Wrapping deployment with local-only git repository.\n'
+            gitAdd
+        fi
         ;;
 
     # --mode db
@@ -1190,12 +1183,12 @@ case "$MODE" in
         doFileReconfigure
         # create repository in background
         (
-			# Add GIT repo if this is not a redo.
-			if [[ ! -d '.git.merchant' ]]
-			then
-				gitAdd
-			fi
-		) &
+            # Add GIT repo if this is not a redo.
+            if [[ ! -d '.git.merchant' ]]
+            then
+                gitAdd
+            fi
+        ) &
         restoreDb
         doDbReconfigure
         ;;
