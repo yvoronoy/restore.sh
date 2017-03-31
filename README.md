@@ -128,3 +128,7 @@ In order to see a progress bar while restoring a dump you will need to install t
 OS X users will need to install a newer version of `getopt` from a repository like MacPorts:
 
 `> sudo port install getopt`
+
+# [LWM]AMP
+Also note that xAMP users will need to be sure their desired version of PHP is
+in the command path.
