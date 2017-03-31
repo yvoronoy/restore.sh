@@ -14,6 +14,7 @@ Code was added to accept other file endings other than ".gz" and to also to acce
 
 Some systems might display the message
 > mdoc warning: Empty input line #
+
 Those messages can be ignored.
 
 # Magento 1 Support Restore Script
