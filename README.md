@@ -2,10 +2,9 @@
 - Fixed SQL queries so that they accept table names of only digits.
 - Fixed dissagreement between help statement and actual option usage.
 - Changed handling of configuration file so that values from the config file are always used but are overridden by values from the command line. All configuration values can be overwritten by their matching command line option. Where appropriate, options are similar to using "mysql" client.
-- Added modes to only process code or only import data.
-- The added and commented out code is a start at adding/changing the existing table name prefix. Table prefix handling is incomplete.
+- Added modes to only process code or only import DB data.
 - Added options for setting administrator's email and site language with default values from the user.
-- Added automatic restoring of logs archive if it exists.
+- Added automatic restoring of log file archive if it exists.
 - A number of automated features, such as caching, are turned off to aid in debugging.
 
 These changes have been tested with Ubuntu 14.04 Server, Debian 8, OS X 10.11 and 10.12, and on 'aws-sparta-web1'.
