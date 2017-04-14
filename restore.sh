@@ -1,42 +1,45 @@
 #!/bin/bash
 # Magento restore script
 #
-# You can use config file
-# Create file in home directory .restore.conf
+# You can use a config file
+# Create the file in your home directory .restore.conf
 # Or specify path to properly formatted file
 
-trap 'exit 1' INT SIGHUP SIGINT SIGTERM
+CHILD_PID=
 
-export LC_CTYPE=C
-# export LANG=C
+function kill_subprocesses()
+{
+    local PID
+    for PID in $CHILD_PID
+    do
+        if [[`kill -0 $PID` <= /dev/null]]
+        then
+           kill -SIGKILL $PID
+        fi
+    done
+
+    printf '\n'
+    exit
+}
+
+trap 'kill_subprocesses' SIGHUP SIGINT SIGTERM SIGQUIT SIGTSTP SIGSTOP
 
 ####################################################################################################
-#Define variables
-CONFIG_FILE_PATH="${HOME}/.restore.conf"
-
+#Variables with defaults which are allowed to be overwritten by the config file.
 MAGENTO_ROOT="$PWD"
 INSTANCE_DIR_NAME=$(basename "$MAGENTO_ROOT")
 
 DB_HOST='sparta-db'
-SCHEMA_PREFIX="${USER}_"
+DB_USER_PREFIX="${USER}_"
 # The variable DB_SCHEMA is often not quoted throughout the script as it should always appear as one word.
 DB_SCHEMA=
 # The variables DB_USER and DB_PASS are quoted throughout the script as they could contain spaces.
 DB_USER="$USER"
 DB_PASS=
-P_DB_PASS=
 BASE_URL="http://web1.sparta.corp.magento.com/dev/${USER}/"
 FULL_INSTANCE_URL=
-# DEV_TABLE_PREFIX=
-
-TABLE_PREFIX=
-CRYPT_KEY=
-INSTALL_DATE=
-
-DEBUG_MODE=0
-DDR_OPT=
-
-TAR_EXCLUDES="--exclude='._*' --exclude='var/cache' --exclude='var/full_page_cache'"
+CORE_CONFIG_FILE=
+CORE_CONFIG_RUN=0
 
 LOCALE_CODE=${LANG:0:5}
 TIMEZONE=$TZ
@@ -49,8 +52,25 @@ ADMIN_USERNAME='admin'
 ADMIN_PASSWORD='123123q'
 ADMIN_PASSWD_HASH='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D'
 
+# List of user settable variables to display.
+VARIABLES_TO_DISPLAY='MAGENTO_ROOT INSTANCE_DIR_NAME DB_HOST DB_USER_PREFIX DB_SCHEMA DB_USER DB_PASS BASE_URL FULL_INSTANCE_URL LOCALE_CODE TIMEZONE EXCEPTION_LOG_NAME SYSTEM_LOG_NAME ADMIN_EMAIL ADMIN_USERNAME ADMIN_PASSWORD ADMIN_PASSWD_HASH'
+
+# Global variables.
+CONFIG_FILE_PATH="${HOME}/.restore.conf"
+
 # Source of original values when doing a restore from dumps.
 ORIGINAL_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml.merchant"
+
+P_DB_PASS=
+
+TABLE_PREFIX=
+CRYPT_KEY=
+INSTALL_DATE=
+
+DEBUG_MODE=0
+DDR_OPT=
+
+TAR_EXCLUDES="--exclude='._*' --exclude='var/cache' --exclude='var/full_page_cache'"
 
 FORCE_RESTORE=0
 
@@ -61,13 +81,14 @@ FORCE_RESTORE=0
 function showHelp()
 {
     cat <<ENDHELP
-Magento Deployment Restore Script
+Magento 1 Deployment Restore Script
 Usage: ${0} [option]
     -H --help
-            Show available params for script (this screen).
+            This screen.
 
     -c --config-file <file-name>
-            Specify an additional configuration file.
+            Specify an additional configuration file. Variables defined here will override
+            all other command line or ".restore.conf" set variables.
 
     -F --force
             Install without pause to check data.
@@ -80,10 +101,10 @@ Usage: ${0} [option]
 
     -m --mode <run-mode>
             This must have one of the following:
-            "reconfigure", "install-only", "code", or "db"
+            "reconfigure", "install-only", "reconfigure-code", "reconfigure-db", "code", or "db"
             The first two are optional usages of the previous two options.
-            "code" tells the script to only decompress the code, and
-            "db" to only move the data into the database.
+            "code" tells the script to decompress and reconfigure the code, and
+            "db" to move the data into the database and reconfigure the data.
 
     -h --host <host-name>|<ip-address>
             DB host name or IP address, defaults to "sparta-db".
@@ -110,6 +131,13 @@ Usage: ${0} [option]
     -l --locale <locale-code>
             "base/locale/code" configuration value. Defaults to "${LOCALE_CODE}".
 
+    --additional-configs <file-name>
+            File name of additional or custom core config data. The lines must be
+            formated as those in the function "doDbReconfigure".
+
+    -C      Only update core_config_data with the values specified in the
+            additional-configs file. Ignore all other options.
+
 This script can be located anywhere but it assumes the current working directory
 is the new deployment directory with the merchant's backup files. Your
 ".restore.conf" file must be manually created in your home directory.
@@ -118,7 +146,7 @@ Missing entries are given default values. In most cases, if the requested
 value is not included on the command line then the corresponding value from the
 config file is used. In the special case of the DB schema name, if the name is
 empty in the config file and none is entered on the command line then the
-current working directory basename is used with the value in SCHEMA_PREFIX.
+current working directory basename is used with the value in DB_USER_PREFIX.
 Digits are allowed as a DB name. Sparta users might not need a configuration file.
 
 Some of the available config names with their default values are:
@@ -129,14 +157,14 @@ DB_SCHEMA=
 DB_PASS=
 DB_USER=${DB_USER}
 DEBUG_MODE=0
-SCHEMA_PREFIX=${SCHEMA_PREFIX}
+DB_USER_PREFIX=${DB_USER_PREFIX}
 LOCALE_CODE=${LOCALE_CODE}
 
 Sample ".restore.conf" on a local OSX workstation with MAMP:
 DB_HOST=localhost
 DB_USER=magento
 DB_PASS=magpass
-SCHEMA_PREFIX=
+DB_USER_PREFIX=
 BASE_URL=http://localhost/
 
 NOTE: OS X users will need to install a newer version of "getopt" from a
@@ -153,7 +181,7 @@ ENDHELP
 ####################################################################################################
 # Selftest for checking tools which will used
 checkTools() {
-    local MISSED_REQUIRED_TOOLS=''
+    local MISSED_REQUIRED_TOOLS=
 
     for TOOL in 'sed' 'tar' 'mysql' 'head' 'gzip' 'getopt' 'mysqladmin' 'php'
     do
@@ -182,7 +210,7 @@ function initVariables()
 
     if [[ -z "$DB_SCHEMA" ]]
     then
-        DB_SCHEMA="$SCHEMA_PREFIX$INSTANCE_DIR_NAME"
+        DB_SCHEMA="$DB_USER_PREFIX$INSTANCE_DIR_NAME"
     fi
 
     if [[ -z "$FULL_INSTANCE_URL" ]]
@@ -190,19 +218,11 @@ function initVariables()
         FULL_INSTANCE_URL="${BASE_URL}${INSTANCE_DIR_NAME}/"
     fi
 
-    cat <<ENDCHECK
-Check parameters:
-Admin username is: $ADMIN_USERNAME
-Admin email is: $ADMIN_EMAIL
-Admin password is: $ADMIN_PASSWORD
-DB host is: $DB_HOST
-DB name is: $DB_SCHEMA
-DB user is: $DB_USER
-DB pass is: $DB_PASS
-Full instance url is: $FULL_INSTANCE_URL
-Locale code is: $LOCALE_CODE
-Timezone is: $TIMEZONE
-ENDCHECK
+    printf 'Check parameters:\n'
+    for VAR in $VARIABLES_TO_DISPLAY
+    do
+        printf '%#-20s%s\n' "$VAR" "$(eval echo \$$VAR)"
+    done
 
     if [[ ${FORCE_RESTORE} -eq 0 ]]
     then
@@ -317,9 +337,11 @@ function restoreDb()
 
     if which pv > /dev/null
     then
-        pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS --force $DB_SCHEMA 2>/dev/null
+        pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | \
+            mysql -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS --force $DB_SCHEMA 2>/dev/null
     else
-        gunzip -c "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | mysql -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS --force $DB_SCHEMA 2>/dev/null
+        gunzip -c "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | \
+            mysql -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS --force $DB_SCHEMA 2>/dev/null
     fi
 }
 
@@ -330,8 +352,9 @@ function doDbReconfigure()
 
     getMerchantLocalXmlValues
 
-    # Copy core_config_data table. MySQL >= 5.5 gives a warning if destination table exists and does not copy data.
-    runMysqlQuery "CREATE TABLE IF NOT EXISTS ${TABLE_PREFIX}core_config_data_merchant AS SELECT * FROM ${TABLE_PREFIX}core_config_data"
+    runMysqlQuery " \
+        CREATE TABLE IF NOT EXISTS ${TABLE_PREFIX}core_config_data_merchant AS \
+        SELECT * FROM ${TABLE_PREFIX}core_config_data"
 
     # Set convenient values for testing.
     setConfigValue 'admin/captcha/enable' '0'
@@ -392,9 +415,33 @@ function doDbReconfigure()
         USER_ID=$(printf "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
     fi
 
-    runMysqlQuery "UPDATE ${TABLE_PREFIX}admin_user SET password='${ADMIN_PASSWD_HASH}', username='${ADMIN_USERNAME}', is_active=1, email='${ADMIN_EMAIL}' WHERE user_id = ${USER_ID}"
+    runMysqlQuery " \
+        UPDATE ${TABLE_PREFIX}admin_user \
+        SET password='${ADMIN_PASSWD_HASH}', \
+            username='${ADMIN_USERNAME}', \
+            is_active=1, \
+            email='${ADMIN_EMAIL}' \
+        WHERE user_id = ${USER_ID}"
 
-    runMysqlQuery "UPDATE ${TABLE_PREFIX}enterprise_admin_passwords SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) WHERE user_id = ${USER_ID}"
+    runMysqlQuery " \
+        UPDATE ${TABLE_PREFIX}enterprise_admin_passwords \
+        SET expires = UNIX_TIMESTAMP() + (365 * 24 * 60 * 60) \
+        WHERE user_id = ${USER_ID}"
+
+    additionalDbConfig
+}
+
+function additionalDbConfig()
+{
+    if [[ -n "$CORE_CONFIG_FILE" ]]
+    then
+        if [[ -f "$CORE_CONFIG_FILE" ]]
+        then
+            source "$CORE_CONFIG_FILE"
+        else
+            printf 'Additional configs file could not be found.\n'
+        fi
+    fi
 }
 
 ##  Pass parameters as: key value
@@ -1008,14 +1055,26 @@ function installOnly()
 
     chmod 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/media"
 
-    php -f install.php -- --license_agreement_accepted yes --locale $LOCALE_CODE \
-        --timezone $TIMEZONE --default_currency USD \
-        --db_host $DB_HOST --db_name $DB_SCHEMA --db_user "$DB_USER" --db_pass "$DB_PASS" \
-        --url "$FULL_INSTANCE_URL" --use_rewrites yes \
-        --use_secure no --secure_base_url "$FULL_INSTANCE_URL" --use_secure_admin no \
+    php -f install.php --
+        --license_agreement_accepted yes \
+        --locale $LOCALE_CODE \
+        --timezone $TIMEZONE \
+        --default_currency USD \
+        --db_host $DB_HOST \
+        --db_name $DB_SCHEMA \
+        --db_user "$DB_USER" \
+        --db_pass "$DB_PASS" \
+        --url "$FULL_INSTANCE_URL" \
+        --use_rewrites yes \
+        --use_secure no \
+        --secure_base_url $FULL_INSTANCE_URL \
+        --use_secure_admin no \
         --skip_url_validation yes \
-        --admin_firstname Store --admin_lastname Owner --admin_email "$ADMIN_EMAIL" \
-        --admin_username "$ADMIN_USERNAME" --admin_password "$ADMIN_PASSWORD"
+        --admin_firstname Store \
+        --admin_lastname Owner \
+        --admin_email $ADMIN_EMAIL \
+        --admin_username "$ADMIN_USERNAME" \
+        --admin_password "$ADMIN_PASSWORD"
 }
 
 ####################################################################################################
@@ -1080,6 +1139,7 @@ then
 fi
 
 # Read defaults from config file. They will overwrite corresponding variables.
+# An additional config file, specified as a command option, will be read later.
 if [[ -f "$CONFIG_FILE_PATH" ]]
 then
     source "$CONFIG_FILE_PATH"
@@ -1088,8 +1148,8 @@ fi
 ####################################################################################################
 #   Parse options and set environment.
 OPTIONS=`getopt \
-    -o Hc:Frim:h:D:u:p:f:b:e:l: \
-    -l help,config-file:,force,reconfigure,install,mode:,host:,database:,user:,password:,full-instance-url:,email:,locale: \
+    -o Hc:Frim:h:D:u:p:f:b:e:l:C \
+    -l help,config-file:,force,reconfigure,install,mode:,host:,database:,user:,password:,full-instance-url:,email:,locale:,additional-configs: \
     -n "$0" -- "$@"`
 
 if [[ $? != 0 ]]
@@ -1116,6 +1176,8 @@ while true; do
         -f|--full-instance-url )    FULL_INSTANCE_URL="$2"; shift 2;;
         -e|--email )                ADMIN_EMAIL="$2"; shift 2;;
         -l|--locale )               LOCALE_CODE="$2"; shift 2;;
+        --additional-configs )      CORE_CONFIG_FILE="$2"; shift 2;;
+        -C )                        CORE_CONFIG_RUN=1; shift 1;;
         -- ) shift; break;;
         * ) printf 'Internal getopt parse error.\n\n'; showHelp; exit 1;;
     esac
@@ -1125,9 +1187,16 @@ done
 ####################################################################################################
 # Execute.
 
+# If doing this then do nothing else.
+if [[ $CORE_CONFIG_RUN -gt 0 ]]
+then
+    additionalDbConfig
+    exit 0
+fi
+
 # Catch bad modes before initializing variables.
 case "$MODE" in
-    reconfigure|install-only|code|db) ;;
+    reconfigure|install-only|reconfigure-code|reconfigure-db|code|db) ;;
     '') ;;
     *) printf 'Bad mode.\n\n'; showHelp; exit 1 ;;
 esac
@@ -1175,10 +1244,21 @@ case "$MODE" in
         doDbReconfigure
         ;;
 
+    # --mode reconfigure-code
+    reconfigure-code)
+        doFileReconfigure
+        ;;
+
+    # --mode reconfigure-db
+    reconfigure-db)
+        doDbReconfigure
+        ;;
+
     # Empty "mode". Do everything.
     '')
         # create DB in background
         ( createDb ) &
+        CHILD_PID="${CHILD_PID}${!} "
         extractCode
         doFileReconfigure
         # create repository in background
@@ -1189,6 +1269,7 @@ case "$MODE" in
                 gitAdd
             fi
         ) &
+        CHILD_PID="${CHILD_PID}${!} "
         restoreDb
         doDbReconfigure
         ;;
