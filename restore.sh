@@ -5,6 +5,11 @@
 # Create the file in your home directory .restore.conf
 # Or specify path to properly formatted file
 
+# Be sure to use MAMP alias, if any.
+# MAMP sets an alias rather than changing the command path.
+if [[ -f ~/.profile ]] ; then shopt -s expand_aliases ; source ~/.profile ; fi
+
+# Be sure to kill subprocesses if script is killed.
 CHILD_PID=
 
 function kill_subprocesses()
@@ -12,7 +17,7 @@ function kill_subprocesses()
     local PID
     for PID in $CHILD_PID
     do
-        if [[`kill -0 $PID` <= /dev/null]]
+        if [[$(kill -0 $PID) <= /dev/null]]
         then
            kill -SIGKILL $PID
         fi
@@ -53,13 +58,14 @@ ADMIN_PASSWORD='123123q'
 ADMIN_PASSWD_HASH='eef6ebe8f52385cdd347d75609309bb29a555d7105980916219da792dc3193c6:6D'
 
 # List of user settable variables to display.
-VARIABLES_TO_DISPLAY='MAGENTO_ROOT INSTANCE_DIR_NAME DB_HOST DB_USER_PREFIX DB_SCHEMA DB_USER DB_PASS BASE_URL FULL_INSTANCE_URL LOCALE_CODE TIMEZONE EXCEPTION_LOG_NAME SYSTEM_LOG_NAME ADMIN_EMAIL ADMIN_USERNAME ADMIN_PASSWORD ADMIN_PASSWD_HASH'
+VARIABLES_TO_DISPLAY='
+    MAGENTO_ROOT INSTANCE_DIR_NAME DB_HOST DB_USER_PREFIX DB_SCHEMA DB_USER DB_PASS
+    BASE_URL FULL_INSTANCE_URL LOCALE_CODE TIMEZONE EXCEPTION_LOG_NAME SYSTEM_LOG_NAME
+    ADMIN_EMAIL ADMIN_USERNAME ADMIN_PASSWORD ADMIN_PASSWD_HASH
+'
 
 # Global variables.
 CONFIG_FILE_PATH="${HOME}/.restore.conf"
-
-# Source of original values when doing a restore from dumps.
-ORIGINAL_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml.merchant"
 
 P_DB_PASS=
 
@@ -221,7 +227,7 @@ function initVariables()
     printf 'Check parameters:\n'
     for VAR in $VARIABLES_TO_DISPLAY
     do
-        printf '%#-20s%s\n' "$VAR" "$(eval echo \$$VAR)"
+        printf '%#-20s%s\n' "$VAR" $(eval echo \$$VAR)
     done
 
     if [[ ${FORCE_RESTORE} -eq 0 ]]
@@ -239,7 +245,7 @@ function initVariables()
         P_DB_PASS="-p$DB_PASS"
     fi
 
-    if [[ -n `man tar | grep delay-directory-restore` ]]
+    if [[ -n "$(man tar | grep delay-directory-restore)" ]]
     then
         DDR_OPT='--delay-directory-restore'
     fi
@@ -248,7 +254,7 @@ function initVariables()
 ####################################################################################################
 function extractCode()
 {
-    FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2> /dev/null | grep -v '\.logs\.' | grep -v '\.sql\.' | head -n1)
+    FILENAME="$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2> /dev/null | grep -v '\.logs\.' | grep -v '\.sql\.' | head -n1)"
 
     debug 'Code dump Filename' "$FILENAME"
 
@@ -264,7 +270,7 @@ function extractCode()
     mkdir -pm 2777 "${MAGENTO_ROOT}/var" "${MAGENTO_ROOT}/media"
 
     # Also do the log archive if it exists.
-    FILENAME=$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '\.logs\.' | head -n1)
+    FILENAME="$(ls -1 *.gz *.tgz *.bz2 *.tbz2 *.tbz *.gz *.bz *.bz2 2>/dev/null | grep '\.logs\.' | head -n1)"
     if [[ -n "$FILENAME" ]]
     then
         printf 'Extracting log files.\n'
@@ -316,9 +322,9 @@ function expandFileArchive
 ####################################################################################################
 function createDb
 {
-    mysqladmin --force -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS drop $DB_SCHEMA &>/dev/null
+    mysqladmin --force -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS drop $DB_SCHEMA >/dev/null 2>&1
 
-    mysqladmin -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS create $DB_SCHEMA 2>/dev/null
+    mysqladmin -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS create $DB_SCHEMA >/dev/null 2>&1
 }
 
 function restoreDb()
@@ -337,7 +343,9 @@ function restoreDb()
 
     if which pv > /dev/null
     then
-        pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | \
+#         pv "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | \
+#             mysql -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS --force $DB_SCHEMA 2>/dev/null
+        pv "$FILENAME" | gunzip -cf | \
             mysql -h"$DB_HOST" -u"$DB_USER" $P_DB_PASS --force $DB_SCHEMA 2>/dev/null
     else
         gunzip -c "$FILENAME" | gunzip -cf | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/\*/' | \
@@ -406,13 +414,13 @@ function doDbReconfigure()
     runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1"
     debug 'SQLQUERY_RESULT' "$SQLQUERY_RESULT"
 
-    USER_ID=$(printf "$SQLQUERY_RESULT" | tr -Cd '[:digit:]');
+    USER_ID=$(printf "$SQLQUERY_RESULT" | tr -Cd '[:digit:]')
     debug 'USER_ID' "$USER_ID"
 
     if [[ -z "$USER_ID" ]]
     then
         runMysqlQuery "SELECT user_id FROM ${TABLE_PREFIX}admin_user ORDER BY user_id ASC LIMIT 1"
-        USER_ID=$(printf "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//');
+        USER_ID=$(printf "$SQLQUERY_RESULT" | sed -e 's/^[a-zA-Z_]*//')
     fi
 
     runMysqlQuery " \
@@ -449,6 +457,7 @@ function setConfigValue()
 {
     # Using "insert...on duplicate key update" won't update values in all scopes.
     runMysqlQuery "SELECT value FROM ${TABLE_PREFIX}core_config_data WHERE path = '$1' LIMIT 1"
+
     if [[ -z "$SQLQUERY_RESULT" ]]
     then
         runMysqlQuery "INSERT INTO ${TABLE_PREFIX}core_config_data SET path = '$1', value = '$2'"
@@ -464,7 +473,7 @@ function deleteFromConfigWhere()
 
 function runMysqlQuery()
 {
-    SQLQUERY_RESULT=$(mysql -h$DB_HOST -u"$DB_USER" $P_DB_PASS -D $DB_SCHEMA -e "$1" 2>/dev/null);
+    SQLQUERY_RESULT=$(mysql -h$DB_HOST -u"$DB_USER" $P_DB_PASS -D $DB_SCHEMA -e "$1" 2>/dev/null)
 }
 
 function getMerchantLocalXmlValues()
@@ -486,7 +495,15 @@ function getMerchantLocalXmlValues()
 getLocalXmlValue()
 {
     # First look for value surrounded by "CDATA" construct.
-    LOCAL_XML_SEARCH="s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p"
+    local LOCAL_XML_SEARCH="s/.*<${1}><!\[CDATA\[\(.*\)\]\]><\/${1}>.*/\1/p"
+
+    if [[ -e "${MAGENTO_ROOT}/app/etc/local.xml.merchant" ]]
+    then
+        local ORIGINAL_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml.merchant"
+    else
+        local ORIGINAL_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml"
+    fi
+
     debug 'local XML search string' "$LOCAL_XML_SEARCH"
     PARAMVALUE=$(sed -n -e "$LOCAL_XML_SEARCH" "$ORIGINAL_LOCAL_XML" | head -n 1)
     debug 'local XML found' "$PARAMVALUE"
@@ -1055,7 +1072,7 @@ function installOnly()
 
     chmod 2777 "${MAGENTO_ROOT}/app/etc" "${MAGENTO_ROOT}/media"
 
-    php -f install.php --
+    php -f install.php -- \
         --license_agreement_accepted yes \
         --locale $LOCALE_CODE \
         --timezone $TIMEZONE \
@@ -1110,7 +1127,7 @@ GIT_IGNORE_EOF
 
     git init >/dev/null 2>&1
 
-    if [[ `uname` = 'Darwin' ]]
+    if [[ "$(uname)" = 'Darwin' ]]
     then
         FIND_REGEX_TYPE='find -E . -type f'
     else
@@ -1135,7 +1152,7 @@ checkTools
 # Set timezone default after checking for tools.
 if [[ -z "$TIMEZONE" ]]
 then
-    TIMEZONE=`php -r 'echo date_default_timezone_get();'`
+    TIMEZONE=$(php -r 'echo date_default_timezone_get();')
 fi
 
 # Read defaults from config file. They will overwrite corresponding variables.
@@ -1147,10 +1164,10 @@ fi
 
 ####################################################################################################
 #   Parse options and set environment.
-OPTIONS=`getopt \
+OPTIONS=$(getopt \
     -o Hc:Frim:h:D:u:p:f:b:e:l:C \
     -l help,config-file:,force,reconfigure,install,mode:,host:,database:,user:,password:,full-instance-url:,email:,locale:,additional-configs: \
-    -n "$0" -- "$@"`
+    -n "$0" -- "$@")
 
 if [[ $? != 0 ]]
 then
@@ -1212,13 +1229,11 @@ case "$MODE" in
 
     # --install-only
     install-only)
-        # In this case there is no merchant version of the file.
-        ORIGINAL_LOCAL_XML="${MAGENTO_ROOT}/app/etc/local.xml"
         createDb
         installOnly
         doDbReconfigure
-        # Add GIT repo if none exists.
-        if [[ ! -d '.git' ]]
+        # Add GIT repo if none exists, regular or worktree.
+        if [[ ! -e '.git' ]]
         then
             printf 'Wrapping deployment with local-only git repository.\n'
             gitAdd
@@ -1258,7 +1273,7 @@ case "$MODE" in
     '')
         # create DB in background
         ( createDb ) &
-        CHILD_PID="${CHILD_PID}${!} "
+        CHILD_PID="${CHILD_PID}$! "
         extractCode
         doFileReconfigure
         # create repository in background
