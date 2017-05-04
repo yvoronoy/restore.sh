@@ -94,7 +94,7 @@ Usage: ${0} [option]
 
     -c --config-file <file-name>
             Specify an additional configuration file. Variables defined here will override
-            all other command line or ".restore.conf" set variables.
+            all other command line or "${CONFIG_FILE}" set variables.
 
     -F --force
             Install without pause to check data.
@@ -145,8 +145,8 @@ Usage: ${0} [option]
             additional-configs file. Ignore all other options.
 
 This script can be located anywhere but it assumes the current working directory
-is the new deployment directory with the merchant's backup files. Your
-".restore.conf" file must be manually created in your home directory.
+is the new deployment directory with the merchant's backup files. Your default
+"${CONFIG_FILE_NAME}" file must be manually created in your home directory.
 
 Missing entries are given default values. In most cases, if the requested
 value is not included on the command line then the corresponding value from the
@@ -177,7 +177,7 @@ NOTE: OS X users will need to install a newer version of "getopt" from a
 repository like MacPorts:
 > sudo port install getopt
 
-Also note that xAMP users will need to be sure their desired version of PHP is
+Also note that xAMP users might need to be sure their desired version of PHP is
 in the command path.
 
 ENDHELP
