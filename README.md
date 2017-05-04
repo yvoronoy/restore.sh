@@ -109,7 +109,7 @@ DB_USER_PREFIX=
 BASE_URL=http://localhost/
 ```
 
-Say you're working on SUPEE-9999 and your web root is "~/dev" on Sparta web 1. Place your dump files in a directory inside your working web root, say "~/dev/9999/". You should see something like this (and type "n" or "no" to cancel the process):
+Say you're working on SUPEE-9999 and your web root is "\~/dev" on Sparta web 1. Place your dump files in a directory inside your working web root, say "\~/dev/9999/". You should see something like this (and type "n" or "no" to cancel the process):
 ```
 [rwoodbury@aws-sparta-web1 9999]$ ../../restore.sh
 Check parameters:
