@@ -107,7 +107,7 @@ Usage: ${0} [option]
 
     -m --mode <run-mode>
             This must have one of the following:
-            "reconfigure", "install-only", "reconfigure-code", "reconfigure-db", "code", or "db"
+            "reconfigure", "install-only", "git-wrap", "reconfigure-code", "reconfigure-db", "code", or "db"
             The first two are optional usages of the previous two options.
             "code" tells the script to decompress and reconfigure the code, and
             "db" to move the data into the database and reconfigure the data.
@@ -189,7 +189,7 @@ ENDHELP
 checkTools() {
     local MISSED_REQUIRED_TOOLS=
 
-    for TOOL in 'sed' 'tar' 'mysql' 'head' 'gzip' 'getopt' 'mysqladmin' 'php'
+    for TOOL in 'sed' 'tar' 'mysql' 'head' 'gzip' 'getopt' 'mysqladmin' 'php' 'git'
     do
         which $TOOL >/dev/null 2>/dev/null
         if [[ $? != 0 ]]
@@ -198,7 +198,7 @@ checkTools() {
         fi
     done
 
-    if [[ -n $MISSED_REQUIRED_TOOLS ]]
+    if [[ -n "$MISSED_REQUIRED_TOOLS" ]]
     then
         printf 'Unable to restore instance due to missing required tools:\n%s\n' "$MISSED_REQUIRED_TOOLS"
         exit 1
@@ -395,7 +395,7 @@ function doDbReconfigure()
 
     setConfigValue 'web/cookie/cookie_domain' ''
     setConfigValue 'web/cookie/cookie_path' ''
-    setConfigValue 'web/cookie/cookie_lifetime' '0'
+    deleteFromConfigWhere "= 'web/cookie/cookie_lifetime'"
 
     setConfigValue 'web/secure/base_url' "$FULL_INSTANCE_URL"
     setConfigValue 'web/secure/use_in_adminhtml' '0'
@@ -969,15 +969,13 @@ function getOrigIndex()
  *
  * @category    Mage
  * @package     Mage
- * @copyright Copyright (c) 2006-2016 X.commerce, Inc. and affiliates (http://www.magento.com)
+ * @copyright Copyright (c) 2006 Magento, Inc. and affiliates (http://www.magento.com)
  * @license http://www.magento.com/license/enterprise-edition
  */
 
 if (version_compare(phpversion(), '5.3.0', '<')===true) {
     echo  '<div style="font:12px/1.35em arial, helvetica, sans-serif;">
-<div style="margin:0 0 25px 0; border-bottom:1px solid #ccc;">
-<h3 style="margin:0; font-size:1.7em; font-weight:normal; text-transform:none; text-align:left; color:#2f2f2f;">
-Whoops, it looks like you have an invalid PHP version.</h3></div><p>Magento supports PHP 5.3.0 or newer.
+<p>Magento supports PHP 5.3.0 or newer.
 <a href="http://www.magentocommerce.com/install" target="">Find out</a> how to install</a>
  Magento using PHP-CGI as a work-around.</p></div>';
     exit;
@@ -1024,9 +1022,7 @@ require_once \$mageFilename;
 
 // Varien_Profiler::enable();
 
-// if (isset(\$_SERVER['MAGE_IS_DEVELOPER_MODE'])) {
-    Mage::setIsDeveloperMode(true);
-// }
+// Mage::setIsDeveloperMode(true);
 
 umask(0);
 
@@ -1213,7 +1209,7 @@ fi
 
 # Catch bad modes before initializing variables.
 case "$MODE" in
-    reconfigure|install-only|reconfigure-code|reconfigure-db|code|db) ;;
+    reconfigure|install-only|git-wrap|reconfigure-code|reconfigure-db|code|db) ;;
     '') ;;
     *) printf 'Bad mode.\n\n'; showHelp; exit 1 ;;
 esac
@@ -1267,6 +1263,16 @@ case "$MODE" in
     # --mode reconfigure-db
     reconfigure-db)
         doDbReconfigure
+        ;;
+
+    # --mode reconfigure-db
+    reconfigure-db)
+        doDbReconfigure
+        ;;
+
+    # --mode git-wrap
+    git-wrap)
+        gitAdd
         ;;
 
     # Empty "mode". Do everything.
