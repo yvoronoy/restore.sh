@@ -331,7 +331,7 @@ function restoreDb()
 {
     printf 'Restoring DB from dump.\n'
 
-    FILENAME=$(ls -1 *.sql.* | head -n1)
+    FILENAME=$(ls -1 *.sql.gz | head -n1)
 
     debug 'DB dump Filename' "$FILENAME"
 
@@ -764,11 +764,12 @@ function getMediaOrigHtaccess()
         return;
     fi
 
-    if [[ ! -f "${MAGENTO_ROOT}/media/.htaccess.merchant" && -f "${MAGENTO_ROOT}/media/.htaccess" ]]
+    if [[ ! -f "${MAGENTO_ROOT}/media/.htaccess.merchant" && -e "${MAGENTO_ROOT}/media/.htaccess" ]]
     then
         mv "${MAGENTO_ROOT}/media/.htaccess" "${MAGENTO_ROOT}/media/.htaccess.merchant"
     fi
 
+    mkdir -p "${MAGENTO_ROOT}/media"
     cat <<EOF > "${MAGENTO_ROOT}/media/.htaccess"
 Options All -Indexes
 <IfModule mod_php5.c>
@@ -1101,6 +1102,7 @@ function gitAdd()
     cat <<GIT_IGNORE_EOF > .gitignore
 /media/
 /var/
+/privatesales/
 /.idea/
 .svn/
 *.gz
