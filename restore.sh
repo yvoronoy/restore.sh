@@ -1227,6 +1227,7 @@ case "$MODE" in
 
     # --install-only
     install-only)
+        #comment out "createDb" if using sample data
         createDb
         installOnly
         doDbReconfigure
@@ -1260,11 +1261,6 @@ case "$MODE" in
     # --mode reconfigure-code
     reconfigure-code)
         doFileReconfigure
-        ;;
-
-    # --mode reconfigure-db
-    reconfigure-db)
-        doDbReconfigure
         ;;
 
     # --mode reconfigure-db
